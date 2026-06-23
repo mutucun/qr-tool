@@ -130,7 +130,6 @@ button:hover {
     <h3>文件</h3>
     <div class="nav" onclick="loadFiles()">📁 所有文件</div>
     <div class="nav" onclick="alert('可扩展')">⭐ 收藏</div>
-
   </div>
 
   <!-- ================= 主区域 ================= -->
@@ -148,9 +147,14 @@ button:hover {
     <!-- content -->
     <div class="content">
 
-      <!-- QR区域 -->
+      <!-- ================= QR区域 ================= -->
       <div id="qrPage">
         <h2>二维码生成</h2>
+
+        <!-- ✅ 新增：QR拖拽上传区域 -->
+        <div id="qrDropzone" class="dropzone">
+          拖拽文件到这里上传（QR页面）
+        </div>
 
         <input id="text" placeholder="文本" />
         <button onclick="genText()">生成QR</button>
@@ -163,7 +167,7 @@ button:hover {
         <p id="info"></p>
       </div>
 
-      <!-- 文件管理 -->
+      <!-- ================= 文件管理 ================= -->
       <div id="filePage" class="hidden">
 
         <div id="dropzone" class="dropzone">
@@ -280,12 +284,12 @@ async function upload(filesList){
   loadFiles();
 }
 
-/* input上传 */
+/* ================= input上传 ================= */
 document.getElementById("fileInput").onchange = e => {
   upload(e.target.files);
 };
 
-/* ================= 拖拽 ================= */
+/* ================= 文件管理拖拽 ================= */
 const dropzone = document.getElementById("dropzone");
 
 dropzone.ondragover = e => {
@@ -302,6 +306,28 @@ dropzone.ondrop = e => {
   dropzone.style.background = "white";
   upload(e.dataTransfer.files);
 };
+
+/* ================= ⭐ QR页面拖拽上传（新增功能） ================= */
+const qrDropzone = document.getElementById("qrDropzone");
+
+if (qrDropzone) {
+
+  qrDropzone.ondragover = e => {
+    e.preventDefault();
+    qrDropzone.style.background = "#eaf3ff";
+  };
+
+  qrDropzone.ondragleave = () => {
+    qrDropzone.style.background = "white";
+  };
+
+  qrDropzone.ondrop = e => {
+    e.preventDefault();
+    qrDropzone.style.background = "white";
+
+    upload(e.dataTransfer.files);
+  };
+}
 
 </script>
 
