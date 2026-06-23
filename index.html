@@ -4,10 +4,12 @@
 <meta charset="UTF-8" />
 <title>QR + File Manager</title>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
 <style>
 body {
   margin:0;
-  font-family:Segoe UI;
+  font-family:Segoe UI, sans-serif;
   background:#f3f3f3;
 }
 
@@ -24,6 +26,7 @@ body {
   padding:8px;
   cursor:pointer;
   border-radius:6px;
+  margin-bottom: 5px;
 }
 
 .nav:hover { background:#eaeaea; }
@@ -56,7 +59,7 @@ button:hover { background:#f0f0f0; }
 
 .content {
   flex:1;
-  padding:10px;
+  padding:20px;
   overflow:auto;
 }
 
@@ -64,8 +67,28 @@ button:hover { background:#f0f0f0; }
   border:2px dashed #aaa;
   background:#fff;
   padding:15px;
-  margin-bottom:10px;
+  margin-bottom:15px;
   text-align:center;
+  border-radius: 6px;
+}
+
+.section-box {
+  background: #fff;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.section-box textarea {
+  width: 100%;
+  height: 80px;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+  margin-bottom: 10px;
 }
 
 .file-row {
@@ -109,6 +132,44 @@ button:hover { background:#f0f0f0; }
   background:#fff;
   border-radius:6px;
 }
+
+/* 二维码展示区块样式 */
+.qr-card {
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  vertical-align: top;
+  width: 220px;
+}
+
+.qr-card img {
+  width: 180px;
+  height: 180px;
+  margin-top: 8px;
+}
+
+.qr-card p {
+  font-size: 12px;
+  color: #333;
+  margin: 4px 0;
+  word-break: break-all;
+  text-align: left;
+}
+
+#textQrResult {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+  padding: 10px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
 </style>
 </head>
 
@@ -118,9 +179,9 @@ button:hover { background:#f0f0f0; }
 
   <div class="sidebar">
     <h3>二维码工具</h3>
-    <div class="nav" onclick="showQR()">QR生成</div>
+    <div class="nav" onclick="showQR()">QR生成 / 文本转码</div>
 
-    <h3>模式</h3>
+    <h3>模式（针对文件上传）</h3>
     <button onclick="toggleMode()" id="modeBtn">模式：单二维码</button>
 
     <h3>文件</h3>
@@ -130,11 +191,9 @@ button:hover { background:#f0f0f0; }
   <div class="main">
 
     <div class="toolbar">
-      <button onclick="fileInput.click()">上传</button>
+      <button onclick="fileInput.click()">上传文件</button>
       <button onclick="deleteSelected()">删除</button>
       <button onclick="refreshFiles()">刷新</button>
-
-      <!-- ⭐ 新增 -->
       <button onclick="toggleSelectAll()">全选</button>
 
       <input type="file" id="fileInput" multiple class="hidden" />
@@ -144,25 +203,33 @@ button:hover { background:#f0f0f0; }
 
     <div class="content">
 
-      <!-- QR -->
       <div id="qrPage">
-        <h2>二维码生成</h2>
+        <h2>二维码生成与文本转码</h2>
 
-        <div id="qrDropzone" class="dropzone">拖拽上传（QR）</div>
+        <div class="section-box">
+          <h3>1. 输入文本或 URL 转二维码</h3>
+          <textarea id="textInput" placeholder="在这里输入或粘贴你想转换的网址(URL)或纯文本..."></textarea>
+          <button onclick="generateTextQR()" style="background: #4a90e2; color: #fff; border: none;">生成文本二维码</button>
+          
+          <div id="textQrResult" class="hidden">
+            <p id="textQrInfo" style="word-break: break-all; font-weight: bold; color: #4a90e2;"></p>
+            <div id="textQrCanvas"></div>
+          </div>
+        </div>
 
-        <img id="qr" style="width:200px;height:200px;" />
-        <p id="info"></p>
-
-        <div id="multiQRBox"></div>
+        <div class="section-box">
+          <h3>2. 上传文件转二维码</h3>
+          <div id="qrDropzone" class="dropzone">拖拽文件到此处上传并生成二维码</div>
+          
+          <h3>文件二维码生成结果</h3>
+          <div id="multiQRBox"></div>
+        </div>
       </div>
 
-      <!-- FILES -->
       <div id="filePage" class="hidden">
-        <div id="dropzone" class="dropzone">拖拽上传文件</div>
-
+        <h2>文件管理</h2>
+        <div id="dropzone" class="dropzone">拖拽上传文件到资源库</div>
         <div id="fileList"></div>
-
-        <!-- ⭐ 预览区 -->
         <div id="previewBox"></div>
       </div>
 
@@ -177,70 +244,95 @@ const API = "https://qrapi.mutucun.com";
 let qrMode = "single";
 let files = [];
 let selected = new Set();
+let textQrHelper = null; 
 
 const $ = (id)=>document.getElementById(id);
 
-/* ================= mode ================= */
+/* ================= 文本/URL纯前端转二维码逻辑 ================= */
+function generateTextQR() {
+  const content = $("textInput").value.trim();
+  if (!content) {
+    alert("请输入一些文本或URL后再生成！");
+    return;
+  }
+
+  // 显示文本二维码区域并清空旧图
+  $("textQrResult").classList.remove("hidden");
+  $("textQrCanvas").innerHTML = ""; 
+  $("textQrInfo").innerText = content;
+
+  // 调用前端的 qrcode.js 在指定容器里生成
+  textQrHelper = new QRCode($("textQrCanvas"), {
+    text: content,
+    width: 180,
+    height: 180,
+    colorDark : "#000000",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+  });
+}
+
+/* ================= 模式切换 ================= */
 function toggleMode(){
   qrMode = qrMode === "single" ? "group" : "single";
   $("modeBtn").innerText =
     "模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
 }
 
-/* ================= QR ================= */
-function showQRResult(res){
-
-  const url = res.groupUrl || res.fileUrl;
-
-  if(qrMode === "single"){
-    $("qr").src = res.qr;
-    $("info").innerText = url;
-    $("multiQRBox").innerHTML = "";
-  } else {
-    $("qr").src = res.qr;
-    $("info").innerText = url;
-    $("multiQRBox").innerHTML = `
-      <div>${url}</div>
-      <img src="${res.qr}">
-    `;
-  }
-}
-
-/* ================= upload ================= */
+/* ================= 文件上传核心逻辑 ================= */
 async function upload(list){
-
+  if(list.length === 0) return;
   $("uploadProgress").innerHTML = "";
 
+  // 集合二维码模式：多个文件打包成一个链接/二维码
   if(qrMode === "group" && list.length > 1){
-
+    // 清空历史文件二维码
+    $("multiQRBox").innerHTML = "正在生成集合二维码...";
+    
     const fd = new FormData();
     for(const f of list) fd.append("file", f);
 
-    const res = await fetch(`${API}/upload-group`, {
-      method:"POST",
-      body: fd
-    });
-
-    const data = await res.json();
-    showQRResult(data);
+    try {
+      const res = await fetch(`${API}/upload-group`, {
+        method:"POST",
+        body: fd
+      });
+      const data = await res.json();
+      
+      const url = data.groupUrl || data.fileUrl;
+      // 集合模式只生成并渲染一个卡片
+      $("multiQRBox").innerHTML = `
+        <div class="qr-card">
+          <p><b>集合包文件</b></p>
+          <p><a href="${url}" target="_blank">点击打开集合链接</a></p>
+          <img src="${data.qr}">
+        </div>
+      `;
+    } catch(err) {
+      $("multiQRBox").innerHTML = "集合二维码生成失败，请检查后端服务";
+    }
+    
     refreshFiles();
     return;
   }
 
-  for(const file of list){
+  // 单二维码模式：遍历上传每一个文件，并【顺次追加】生成各自的二维码卡片
+  // 如果是新一轮上传，可以先清空旧的展示
+  $("multiQRBox").innerHTML = "";
 
+  for(const file of list){
+    // 1. 创建并展示进度条
     const item = document.createElement("div");
     item.className = "progress-item";
     item.innerHTML = `
-      <div>${file.name}</div>
+      <div>正在上传: ${file.name}</div>
       <div class="progress-bar"><div class="progress-bar-inner"></div></div>
     `;
-
     const bar = item.querySelector(".progress-bar-inner");
     $("uploadProgress").appendChild(item);
 
-    await new Promise((resolve,reject)=>{
-
+    // 2. 异步上传单个文件
+    await new Promise((resolve, reject)=>{
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${API}/upload`);
 
@@ -250,32 +342,42 @@ async function upload(list){
         }
       };
 
-      xhr.onload = ()=>{
-        const res = JSON.parse(xhr.responseText);
-        bar.style.width = "100%";
+      xhr.onload = () => {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          bar.style.width = "100%";
 
-        const div = document.createElement("div");
-        div.innerHTML = `
-          <div>${res.fileUrl}</div>
-          <img src="${res.qr}" width="120">
-        `;
-        $("multiQRBox").appendChild(div);
+          // 3. 核心修复点：不覆盖，而是往展示区 appendChild（追加）一整块新的独立的二维码卡片
+          const card = document.createElement("div");
+          card.className = "qr-card";
+          card.innerHTML = `
+            <p><strong>文件名:</strong> ${file.name}</p>
+            <p><strong>链接:</strong> <a href="${res.fileUrl}" target="_blank">点击查看</a></p>
+            <img src="${res.qr}" alt="二维码">
+          `;
+          $("multiQRBox").appendChild(card);
 
-        resolve(res);
+          resolve(res);
+        } catch(e) {
+          reject(e);
+        }
       };
 
-      xhr.onerror = reject;
+      xhr.onerror = () => {
+        item.insertAdjacentHTML('beforeend', '<div style="color:red">上传失败</div>');
+        reject(new Error("网络错误"));
+      };
 
       const fd = new FormData();
       fd.append("file", file);
       xhr.send(fd);
-    });
+    }).catch(err => console.error("文件上传出错:", err));
   }
 
   refreshFiles();
 }
 
-/* ================= files ================= */
+/* ================= 资源库管理功能 ================= */
 function loadFiles(){
   $("qrPage").classList.add("hidden");
   $("filePage").classList.remove("hidden");
@@ -288,23 +390,19 @@ function refreshFiles(){
     .then(d=>{
       files = d;
       render();
-    });
+    }).catch(err => console.log("获取文件列表失败"));
 }
 
-/* ================= render + preview ================= */
 function render(){
   $("fileList").innerHTML = "";
-
   files.forEach(f=>{
     const div=document.createElement("div");
     div.className="file-row";
-
     div.innerHTML=`
       <input type="checkbox" onchange="toggle('${f.key}', this)">
       <div class="file-name">${f.name}</div>
       <button onclick="previewFile('${f.url}')">预览</button>
     `;
-
     div.ondblclick=()=>window.open(f.url);
     $("fileList").appendChild(div);
   });
@@ -315,30 +413,23 @@ function toggle(k, el){
   else selected.delete(k);
 }
 
-/* ================= 全选 ================= */
 function toggleSelectAll(){
   const boxes = document.querySelectorAll("#fileList input[type=checkbox]");
-
   const shouldSelect = selected.size !== files.length;
-
   selected.clear();
-
   boxes.forEach((b,i)=>{
     b.checked = shouldSelect;
     if(shouldSelect) selected.add(files[i].key);
   });
 }
 
-/* ================= 预览 ================= */
 function previewFile(url){
-
   const box = $("previewBox");
   box.innerHTML = "加载中...";
 
   fetch(url)
     .then(r=>r.blob())
     .then(blob=>{
-
       if(blob.type.startsWith("image/")){
         const img = document.createElement("img");
         img.src = URL.createObjectURL(blob);
@@ -347,64 +438,51 @@ function previewFile(url){
         box.appendChild(img);
         return;
       }
-
       if(blob.type.startsWith("text/")){
         const reader = new FileReader();
         reader.onload = ()=>{
-          box.innerHTML =
-            `<pre style="white-space:pre-wrap">${reader.result.slice(0,2000)}</pre>`;
+          box.innerHTML = `<pre style="white-space:pre-wrap">${reader.result.slice(0,2000)}</pre>`;
         };
         reader.readAsText(blob);
         return;
       }
-
       box.innerHTML = `<a href="${url}" target="_blank">无法预览，点击下载</a>`;
+    }).catch(err => {
+      box.innerHTML = "预览失败，可能是CORS跨域问题，请直接双击文件名打开";
     });
 }
 
-/* ================= delete ================= */
 async function deleteSelected(){
+  if(selected.size === 0) {
+    alert("请先勾选要删除的文件");
+    return;
+  }
   await fetch(`${API}/delete`,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify([...selected])
   });
-
   selected.clear();
   refreshFiles();
 }
 
-/* ================= drag ================= */
+/* ================= 拖拽绑定 ================= */
 function bind(id){
   const el=$(id);
   if(!el) return;
-
-  el.ondragover=e=>{
-    e.preventDefault();
-    el.style.background="#eaf3ff";
-  };
-
+  el.ondragover=e=>{ e.preventDefault(); el.style.background="#eaf3ff"; };
   el.ondragleave=()=>el.style.background="#fff";
-
-  el.ondrop=e=>{
-    e.preventDefault();
-    el.style.background="#fff";
-    upload(e.dataTransfer.files);
-  };
+  el.ondrop=e=>{ e.preventDefault(); el.style.background="#fff"; upload(e.dataTransfer.files); };
 }
-
 bind("dropzone");
 bind("qrDropzone");
 
-/* ================= input ================= */
-fileInput.onchange=e=>upload(e.target.files);
+$("fileInput").onchange=e=>upload(e.target.files);
 
-/* ================= page ================= */
 function showQR(){
   $("qrPage").classList.remove("hidden");
   $("filePage").classList.add("hidden");
 }
-
 </script>
 
 </body>
