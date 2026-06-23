@@ -2,173 +2,224 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>QR + File Manager</title>
+<title>Windows 11 资源管理器 & 二维码工作台</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
+:root {
+  --win-blue: #0067b8;
+  --win-bg: #f3f3f3;
+  --win-hover: #e5e5e5;
+  --win-selected: #e0eef9;
+  --win-selected-border: #60cdff;
+}
+
 body {
-  margin:0;
-  font-family:Segoe UI, sans-serif;
-  background:#f3f3f3;
+  margin: 0;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  background: var(--win-bg);
+  color: #333;
+  user-select: none;
+  overflow: hidden;
 }
 
-.container { display:flex; height:100vh; }
+.container { display: flex; height: 100vh; flex-direction: row; }
 
+/* 左侧 Win11 侧边栏 */
 .sidebar {
-  width:220px;
-  background:#fff;
-  border-right:1px solid #ddd;
-  padding:10px;
+  width: 240px;
+  background: rgba(243, 243, 243, 0.85);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid #e0e0e0;
+  padding: 15px 10px;
+  box-sizing: border-box;
 }
 
-.nav {
-  padding:8px;
-  cursor:pointer;
-  border-radius:6px;
-  margin-bottom: 5px;
+.sidebar h3 {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  padding-left: 10px;
+  margin: 15px 0 5px 0;
 }
 
-.nav:hover { background:#eaeaea; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  gap: 10px;
+  transition: background 0.15s;
+}
+.nav-item:hover { background: var(--win-hover); }
+.nav-item.active { background: #eaeaea; font-weight: 600; }
 
+/* 右侧主工作区 */
 .main {
-  flex:1;
-  display:flex;
-  flex-direction:column;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
 }
 
+/* Win11 顶部工具栏 */
 .toolbar {
-  height:50px;
-  background:#fff;
-  border-bottom:1px solid #ddd;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:0 10px;
+  height: 48px;
+  border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  gap: 10px;
+  background: #ffffff;
 }
 
-button {
-  padding:6px 10px;
-  border:1px solid #ccc;
-  background:#fff;
-  border-radius:6px;
-  cursor:pointer;
+.action-group { display: flex; align-items: center; gap: 6px; }
+
+/* 面包屑路径导航栏 */
+.address-bar {
+  height: 32px;
+  background: #f9f9f9;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  margin: 5px 15px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #555;
 }
 
-button:hover { background:#f0f0f0; }
+button.win11-btn {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+button.win11-btn:hover { background: var(--win-hover); }
+button.win11-btn.primary {
+  background: var(--win-blue);
+  color: #fff;
+}
+button.win11-btn.primary:hover { background: #005a1a; }
 
 .content {
-  flex:1;
-  padding:20px;
-  overflow:auto;
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.hidden { display: none !important; }
+
+/* Win11 卡片样式网格平铺 */
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 15px;
+  padding: 5px;
+}
+
+.file-card {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+}
+
+.file-card:hover {
+  background: rgba(0, 103, 184, 0.05);
+  border-color: rgba(0, 103, 184, 0.1);
+}
+
+.file-card.selected {
+  background: var(--win-selected);
+  border-color: var(--win-selected-border);
+}
+
+.file-icon {
+  font-size: 44px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.file-card-name {
+  font-size: 12px;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 16px;
+  height: 32px;
+  padding: 0 4px;
+}
+
+.file-checkbox {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.file-card:hover .file-checkbox, .file-card.selected .file-checkbox {
+  opacity: 1;
 }
 
 .dropzone {
-  border:2px dashed #aaa;
-  background:#fff;
-  padding:15px;
-  margin-bottom:15px;
-  text-align:center;
-  border-radius: 6px;
+  border: 2px dashed #bbb;
+  background: #fafafa;
+  padding: 25px;
+  text-align: center;
+  border-radius: 8px;
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 20px;
 }
 
 .section-box {
   background: #fff;
-  padding: 15px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  margin-bottom: 15px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .section-box textarea {
-  width: 100%;
-  height: 80px;
-  padding: 8px;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  resize: vertical;
-  margin-bottom: 10px;
+  width: 100%; height: 90px; padding: 10px;
+  box-sizing: border-box; border: 1px solid #ccc;
+  border-radius: 4px; resize: vertical; margin-bottom: 12px;
 }
 
-.file-row {
-  display:flex;
-  align-items:center;
-  padding:8px;
-  background:#fff;
-  margin-bottom:6px;
-  border-radius:6px;
-}
-
-.file-name { flex:1; margin-left:10px; }
-
-.hidden { display:none; }
-
-.progress-item {
-  background:#fff;
-  margin:6px 0;
-  padding:8px;
-  border-radius:6px;
-  border:1px solid #ddd;
-}
-
-.progress-bar {
-  height:6px;
-  background:#eee;
-  border-radius:4px;
-  overflow:hidden;
-  margin-top:6px;
-}
-
-.progress-bar-inner {
-  height:100%;
-  width:0%;
-  background:#4a90e2;
-}
-
-#previewBox {
-  margin-top:10px;
-  padding:10px;
-  background:#fff;
-  border-radius:6px;
-}
-
-/* 二维码展示区块样式 */
+.qr-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; }
 .qr-card {
-  display: inline-block;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 12px;
-  margin: 10px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  vertical-align: top;
-  width: 220px;
+  background: #fff; border: 1px solid #e0e0e0;
+  border-radius: 8px; padding: 15px; text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 200px;
 }
+.qr-card img { width: 160px; height: 160px; margin-top: 10px; }
+.qr-card p { font-size: 12px; margin: 5px 0; word-break: break-all; text-align: left; color:#444;}
 
-.qr-card img {
-  width: 180px;
-  height: 180px;
-  margin-top: 8px;
-}
-
-.qr-card p {
-  font-size: 12px;
-  color: #333;
-  margin: 4px 0;
-  word-break: break-all;
-  text-align: left;
-}
-
-#textQrResult {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: 10px;
-  padding: 10px;
-  background: #f9f9f9;
-  border-radius: 4px;
+.preview-pane {
+  border-top: 1px solid #e5e5e5;
+  background: #fafafa;
+  padding: 15px;
+  margin-top: 20px;
+  border-radius: 6px;
 }
 </style>
 </head>
@@ -178,168 +229,209 @@ button:hover { background:#f0f0f0; }
 <div class="container">
 
   <div class="sidebar">
-    <h3>二维码工具</h3>
-    <div class="nav" onclick="showQR()">QR生成 / 文本转码</div>
+    <div style="font-weight: bold; font-size: 16px; margin-bottom: 20px; padding-left: 10px;">⚡ 工作台主页</div>
+    
+    <h3>快捷访问</h3>
+    <div class="nav-item active" id="menu-qr" onclick="switchPage('qr')">🧭 二维码生成</div>
+    <div class="nav-item" id="menu-files" onclick="switchPage('files')">📂 资源管理器 (库)</div>
 
-    <h3>模式（针对文件上传）</h3>
-    <button onclick="toggleMode()" id="modeBtn">模式：单二维码</button>
-
-    <h3>文件</h3>
-    <div class="nav" onclick="loadFiles()">文件管理</div>
+    <h3>工作模式</h3>
+    <button class="win11-btn" style="width: 100%; text-align: left; margin-top: 5px;" onclick="toggleMode()" id="modeBtn">
+      ⚖️ 模式：单二维码
+    </button>
   </div>
 
   <div class="main">
-
     <div class="toolbar">
-      <button onclick="fileInput.click()">上传文件</button>
-      <button onclick="deleteSelected()">删除</button>
-      <button onclick="refreshFiles()">刷新</button>
-      <button onclick="toggleSelectAll()">全选</button>
-
+      <div class="action-group">
+        <button class="win11-btn primary" onclick="fileInput.click()">➕ 上传新文件</button>
+        <button class="win11-btn" onclick="deleteSelected()" style="color: #d13438;">❌ 批量删除</button>
+        <button class="win11-btn" onclick="refreshFiles()">🔄 刷新视图</button>
+        <button class="win11-btn" onclick="toggleSelectAll()">☑️ 全选/反选</button>
+      </div>
+      <div style="font-size: 12px; color: #888;" id="selected-count">已选中 0 个项目</div>
       <input type="file" id="fileInput" multiple class="hidden" />
     </div>
 
-    <div id="uploadProgress"></div>
+    <div class="address-bar" id="address-path">
+      🖥️ 此电脑 &gt; 📥 二维码生成主页
+    </div>
+
+    <div id="uploadProgress" style="padding: 0 15px;"></div>
 
     <div class="content">
-
       <div id="qrPage">
-        <h2>二维码生成与文本转码</h2>
-
         <div class="section-box">
-          <h3>1. 输入文本或 URL 转二维码</h3>
-          <textarea id="textInput" placeholder="在这里输入或粘贴你想转换的网址(URL)或纯文本..."></textarea>
-          <button onclick="generateTextQR()" style="background: #4a90e2; color: #fff; border: none;">生成文本二维码</button>
+          <h3 style="margin-top:0;">✍️ 纯文本 / URL 智能转码</h3>
+          <textarea id="textInput" placeholder="请输入或粘贴你需要转换的网址、文字段落。"></textarea>
+          <button class="win11-btn primary" onclick="generateTextQR()">生成二维码</button>
           
-          <div id="textQrResult" class="hidden">
-            <p id="textQrInfo" style="word-break: break-all; font-weight: bold; color: #4a90e2;"></p>
-            <div id="textQrCanvas"></div>
+          <div id="textQrResult" class="hidden" style="text-align: center; margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 6px;">
+            <p id="textQrInfo" style="word-break: break-all; font-weight: bold; font-size:13px; color:var(--win-blue);"></p>
+            <div id="textQrCanvas" style="display: flex; justify-content: center; margin-top: 10px;"></div>
           </div>
         </div>
 
         <div class="section-box">
-          <h3>2. 上传文件转二维码</h3>
-          <div id="qrDropzone" class="dropzone">拖拽文件到此处上传并生成二维码</div>
+          <h3 style="margin-top:0;">🚀 快捷拖放文件转码区</h3>
+          <div id="qrDropzone" class="dropzone">将文件拖放到这里，上传并生成二维码</div>
           
-          <h3>文件二维码生成结果</h3>
-          <div id="multiQRBox"></div>
+          <h4>📋 本轮上传生成卡片流</h4>
+          <div id="multiQRBox" class="qr-container"></div>
         </div>
       </div>
 
       <div id="filePage" class="hidden">
-        <h2>文件管理</h2>
-        <div id="dropzone" class="dropzone">拖拽上传文件到资源库</div>
-        <div id="fileList"></div>
-        <div id="previewBox"></div>
-      </div>
+        <div id="dropzone" class="dropzone">拖拽文件到此处快速补充到网格资源库</div>
+        <div id="fileGrid" class="file-grid"></div>
 
+        <div class="preview-pane">
+          <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🔍 属性与即时预览面板</strong>
+          <div id="previewBox" style="font-size: 13px; color: #555;">未选中任何可预览的文件。在上方文件双击可打开直链，单击右侧按钮可加载预览。</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-
 const API = "https://qrapi.mutucun.com";
 
 let qrMode = "single";
 let files = [];
 let selected = new Set();
-let textQrHelper = null; 
 
-const $ = (id)=>document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-/* ================= 文本/URL纯前端转二维码逻辑 ================= */
+function getFileIcon(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️';
+  if (['mp4', 'mkv', 'avi', 'mov'].includes(ext)) return '🎬';
+  if (['mp3', 'wav', 'flac'].includes(ext)) return '🎵';
+  if (['txt', 'md', 'json', 'html', 'js'].includes(ext)) return '📄';
+  if (['pdf'].includes(ext)) return '📕';
+  if (['zip', 'rar', '7z', 'tar'].includes(ext)) return '📦';
+  return '📁';
+}
+
+function switchPage(page) {
+  if(page === 'qr') {
+    $("qrPage").classList.remove("hidden");
+    $("filePage").classList.add("hidden");
+    $("menu-qr").classList.add("active");
+    $("menu-files").classList.remove("active");
+    $("address-path").innerText = "🖥️ 此电脑 > 📥 二维码生成主页";
+  } else {
+    $("qrPage").classList.add("hidden");
+    $("filePage").classList.remove("hidden");
+    $("menu-qr").classList.remove("active");
+    $("menu-files").classList.add("active");
+    $("address-path").innerText = "🖥️ 此电脑 > 📂 核心资源管理器 (R2云存储库)";
+    refreshFiles();
+  }
+}
+
 function generateTextQR() {
   const content = $("textInput").value.trim();
-  if (!content) {
-    alert("请输入一些文本或URL后再生成！");
+  if (!content) { alert("请输入内容后再生成！"); return; }
+  $("textQrResult").classList.remove("hidden");
+  $("textQrCanvas").innerHTML = "";
+  $("textQrInfo").innerText = content;
+  new QRCode($("textQrCanvas"), { text: content, width: 160, height: 160 });
+}
+
+function toggleMode() {
+  qrMode = qrMode === "single" ? "group" : "single";
+  $("modeBtn").innerText = "⚖️ 模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
+}
+
+function renderGrid() {
+  const grid = $("fileGrid");
+  grid.innerHTML = "";
+
+  if(files.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">此文件夹为空。</div>`;
     return;
   }
 
-  // 显示文本二维码区域并清空旧图
-  $("textQrResult").classList.remove("hidden");
-  $("textQrCanvas").innerHTML = ""; 
-  $("textQrInfo").innerText = content;
+  files.forEach(f => {
+    const card = document.createElement("div");
+    card.className = "file-card";
+    if (selected.has(f.key)) card.classList.add("selected");
 
-  // 调用前端的 qrcode.js 在指定容器里生成
-  textQrHelper = new QRCode($("textQrCanvas"), {
-    text: content,
-    width: 180,
-    height: 180,
-    colorDark : "#000000",
-    colorLight : "#ffffff",
-    correctLevel : QRCode.CorrectLevel.H
+    card.innerHTML = `
+      <input type="checkbox" class="file-checkbox" ${selected.has(f.key) ? 'checked' : ''}>
+      <span class="file-icon">${getFileIcon(f.name)}</span>
+      <div class="file-card-name" title="${f.name}">${f.name}</div>
+      <button class="win11-btn" style="font-size:11px; padding:2px 4px; margin-top:4px;" onclick="event.stopPropagation(); previewFile('${f.url}')">🔬 预览</button>
+    `;
+
+    card.onclick = () => {
+      if (selected.has(f.key)) { selected.delete(f.key); card.classList.remove("selected"); } 
+      else { selected.add(f.key); card.classList.add("selected"); }
+      updateSelectionUI();
+    };
+
+    card.ondblclick = () => { window.open(f.url); };
+    grid.appendChild(card);
+  });
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  $("selected-count").innerText = `已选中 ${selected.size} 个项目`;
+  document.querySelectorAll('.file-card').forEach(card => {
+    const cb = card.querySelector('.file-checkbox');
+    if(cb) cb.checked = card.classList.contains('selected');
   });
 }
 
-/* ================= 模式切换 ================= */
-function toggleMode(){
-  qrMode = qrMode === "single" ? "group" : "single";
-  $("modeBtn").innerText =
-    "模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
+function toggleSelectAll() {
+  const shouldSelectAll = selected.size !== files.length;
+  selected.clear();
+  if (shouldSelectAll) files.forEach(f => selected.add(f.key));
+  renderGrid();
 }
 
-/* ================= 文件上传核心逻辑 ================= */
-async function upload(list){
-  if(list.length === 0) return;
+async function upload(list) {
+  if (list.length === 0) return;
   $("uploadProgress").innerHTML = "";
 
-  // 集合二维码模式：多个文件打包成一个链接/二维码
-  if(qrMode === "group" && list.length > 1){
-    // 清空历史文件二维码
-    $("multiQRBox").innerHTML = "正在生成集合二维码...";
-    
+  if (qrMode === "group" && list.length > 1) {
+    $("multiQRBox").innerHTML = "正在向 Cloudflare 传输打包集合...";
     const fd = new FormData();
-    for(const f of list) fd.append("file", f);
+    for (const f of list) fd.append("file", f);
 
     try {
-      const res = await fetch(`${API}/upload-group`, {
-        method:"POST",
-        body: fd
-      });
+      const res = await fetch(`${API}/upload-group`, { method: "POST", body: fd });
       const data = await res.json();
-      
-      const url = data.groupUrl || data.fileUrl;
-      // 集合模式只生成并渲染一个卡片
       $("multiQRBox").innerHTML = `
         <div class="qr-card">
-          <p><b>集合包文件</b></p>
-          <p><a href="${url}" target="_blank">点击打开集合链接</a></p>
+          <p>🎁 <b>Win11 共享合集包</b></p>
+          <p><a href="${data.groupUrl}" target="_blank">点击打开 H5 页面</a></p>
           <img src="${data.qr}">
         </div>
       `;
-    } catch(err) {
-      $("multiQRBox").innerHTML = "集合二维码生成失败，请检查后端服务";
-    }
-    
-    refreshFiles();
+    } catch { $("multiQRBox").innerHTML = "打包生成失败。"; }
+    if(!$("filePage").classList.contains("hidden")) refreshFiles();
     return;
   }
 
-  // 单二维码模式：遍历上传每一个文件，并【顺次追加】生成各自的二维码卡片
-  // 如果是新一轮上传，可以先清空旧的展示
-  $("multiQRBox").innerHTML = "";
-
-  for(const file of list){
-    // 1. 创建并展示进度条
+  for (const file of list) {
     const item = document.createElement("div");
     item.className = "progress-item";
     item.innerHTML = `
-      <div>正在上传: ${file.name}</div>
+      <div style="font-size:12px;">正在同步 R2: ${file.name}</div>
       <div class="progress-bar"><div class="progress-bar-inner"></div></div>
     `;
     const bar = item.querySelector(".progress-bar-inner");
     $("uploadProgress").appendChild(item);
 
-    // 2. 异步上传单个文件
-    await new Promise((resolve, reject)=>{
+    await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${API}/upload`);
-
-      xhr.upload.onprogress = e=>{
-        if(e.lengthComputable){
-          bar.style.width = (e.loaded/e.total)*100 + "%";
-        }
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) bar.style.width = (e.loaded / e.total) * 100 + "%";
       };
 
       xhr.onload = () => {
@@ -347,142 +439,83 @@ async function upload(list){
           const res = JSON.parse(xhr.responseText);
           bar.style.width = "100%";
 
-          // 3. 核心修复点：不覆盖，而是往展示区 appendChild（追加）一整块新的独立的二维码卡片
+          // 核心点：强制使用后端返回的标准拼接格式，确保路径对齐
+          const absoluteUrl = `${API}/file/${encodeURIComponent(res.key)}`;
+
           const card = document.createElement("div");
           card.className = "qr-card";
           card.innerHTML = `
-            <p><strong>文件名:</strong> ${file.name}</p>
-            <p><strong>链接:</strong> <a href="${res.fileUrl}" target="_blank">点击查看</a></p>
-            <img src="${res.qr}" alt="二维码">
+            <p style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</p>
+            <p><a href="${absoluteUrl}" target="_blank">获取文件源链接</a></p>
+            <img src="${res.qr}">
           `;
           $("multiQRBox").appendChild(card);
-
           resolve(res);
-        } catch(e) {
-          reject(e);
-        }
+        } catch { reject(); }
       };
-
-      xhr.onerror = () => {
-        item.insertAdjacentHTML('beforeend', '<div style="color:red">上传失败</div>');
-        reject(new Error("网络错误"));
-      };
-
+      xhr.onerror = reject;
       const fd = new FormData();
       fd.append("file", file);
       xhr.send(fd);
-    }).catch(err => console.error("文件上传出错:", err));
+    }).catch(() => {});
   }
-
   refreshFiles();
 }
 
-/* ================= 资源库管理功能 ================= */
-function loadFiles(){
-  $("qrPage").classList.add("hidden");
-  $("filePage").classList.remove("hidden");
-  refreshFiles();
-}
-
-function refreshFiles(){
+function refreshFiles() {
   fetch(`${API}/files`)
-    .then(r=>r.json())
-    .then(d=>{
-      files = d;
-      render();
-    }).catch(err => console.log("获取文件列表失败"));
+    .then(r => r.json())
+    .then(d => { files = d; renderGrid(); })
+    .catch(() => console.error("无法拉取 R2 存储流"));
 }
 
-function render(){
-  $("fileList").innerHTML = "";
-  files.forEach(f=>{
-    const div=document.createElement("div");
-    div.className="file-row";
-    div.innerHTML=`
-      <input type="checkbox" onchange="toggle('${f.key}', this)">
-      <div class="file-name">${f.name}</div>
-      <button onclick="previewFile('${f.url}')">预览</button>
-    `;
-    div.ondblclick=()=>window.open(f.url);
-    $("fileList").appendChild(div);
-  });
-}
-
-function toggle(k, el){
-  if(el.checked) selected.add(k);
-  else selected.delete(k);
-}
-
-function toggleSelectAll(){
-  const boxes = document.querySelectorAll("#fileList input[type=checkbox]");
-  const shouldSelect = selected.size !== files.length;
-  selected.clear();
-  boxes.forEach((b,i)=>{
-    b.checked = shouldSelect;
-    if(shouldSelect) selected.add(files[i].key);
-  });
-}
-
-function previewFile(url){
+function previewFile(url) {
   const box = $("previewBox");
-  box.innerHTML = "加载中...";
+  box.innerHTML = "正在建立流管道，加载预览...";
 
   fetch(url)
-    .then(r=>r.blob())
-    .then(blob=>{
-      if(blob.type.startsWith("image/")){
-        const img = document.createElement("img");
-        img.src = URL.createObjectURL(blob);
-        img.style.maxWidth = "300px";
-        box.innerHTML = "";
-        box.appendChild(img);
-        return;
-      }
-      if(blob.type.startsWith("text/")){
+    .then(r => r.blob())
+    .then(blob => {
+      if (blob.type.startsWith("image/")) {
+        box.innerHTML = `<img src="${URL.createObjectURL(blob)}" style="max-width: 240px; border-radius:4px;">`;
+      } else if (blob.type.startsWith("text/")) {
         const reader = new FileReader();
-        reader.onload = ()=>{
-          box.innerHTML = `<pre style="white-space:pre-wrap">${reader.result.slice(0,2000)}</pre>`;
+        reader.onload = () => {
+          box.innerHTML = `<pre style="background:#eee; padding:8px; border-radius:4px; max-height:150px; overflow:auto; font-size:11px;">${reader.result.slice(0, 1000)}</pre>`;
         };
         reader.readAsText(blob);
-        return;
+      } else {
+        box.innerHTML = `⚠️ 该格式不支持内嵌预览。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击在此打开原文件</a>`;
       }
-      box.innerHTML = `<a href="${url}" target="_blank">无法预览，点击下载</a>`;
-    }).catch(err => {
-      box.innerHTML = "预览失败，可能是CORS跨域问题，请直接双击文件名打开";
+    }).catch(() => {
+      box.innerHTML = `预览受限。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击直接去新标签页打开</a>`;
     });
 }
 
-async function deleteSelected(){
-  if(selected.size === 0) {
-    alert("请先勾选要删除的文件");
-    return;
-  }
-  await fetch(`${API}/delete`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify([...selected])
+async function deleteSelected() {
+  if (selected.size === 0) { alert("请先在网格中单击选中项目！"); return; }
+  if (!confirm(`确定在 R2 中删除选中的 ${selected.size} 个项目吗？`)) return;
+
+  await fetch(`${API}/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([...selected])
   });
   selected.clear();
   refreshFiles();
 }
 
-/* ================= 拖拽绑定 ================= */
-function bind(id){
-  const el=$(id);
-  if(!el) return;
-  el.ondragover=e=>{ e.preventDefault(); el.style.background="#eaf3ff"; };
-  el.ondragleave=()=>el.style.background="#fff";
-  el.ondrop=e=>{ e.preventDefault(); el.style.background="#fff"; upload(e.dataTransfer.files); };
+function bindDrag(id) {
+  const el = $(id);
+  if (!el) return;
+  el.ondragover = e => { e.preventDefault(); el.style.borderColor = "var(--win-blue)"; el.style.background = "#f0f7ff"; };
+  el.ondragleave = () => { el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; };
+  el.ondrop = e => { e.preventDefault(); el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; upload(e.dataTransfer.files); };
 }
-bind("dropzone");
-bind("qrDropzone");
+bindDrag("dropzone");
+bindDrag("qrDropzone");
 
-$("fileInput").onchange=e=>upload(e.target.files);
-
-function showQR(){
-  $("qrPage").classList.remove("hidden");
-  $("filePage").classList.add("hidden");
-}
+$("fileInput").onchange = e => upload(e.target.files);
 </script>
 
 </body>
