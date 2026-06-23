@@ -11,13 +11,11 @@ body {
   background: #f3f3f3;
 }
 
-/* ================= 布局 ================= */
 .container {
   display: flex;
   height: 100vh;
 }
 
-/* ================= 左侧栏 ================= */
 .sidebar {
   width: 220px;
   background: #ffffff;
@@ -37,18 +35,14 @@ body {
   cursor: pointer;
 }
 
-.nav:hover {
-  background: #eaeaea;
-}
+.nav:hover { background: #eaeaea; }
 
-/* ================= 主区域 ================= */
 .main {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* ================= toolbar ================= */
 .toolbar {
   height: 50px;
   background: white;
@@ -67,18 +61,14 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  background: #f0f0f0;
-}
+button:hover { background: #f0f0f0; }
 
-/* ================= 内容区 ================= */
 .content {
   flex: 1;
   padding: 10px;
   overflow: auto;
 }
 
-/* ================= dropzone ================= */
 .dropzone {
   border: 2px dashed #aaa;
   background: white;
@@ -87,7 +77,6 @@ button:hover {
   text-align: center;
 }
 
-/* ================= 文件行（Explorer风格） ================= */
 .file-row {
   display: flex;
   align-items: center;
@@ -96,7 +85,6 @@ button:hover {
   border-radius: 6px;
   margin-bottom: 6px;
   cursor: pointer;
-  transition: 0.2s;
 }
 
 .file-row:hover {
@@ -115,6 +103,27 @@ button:hover {
 
 .hidden { display: none; }
 
+.progress-item {
+  background: white;
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.progress-bar-inner {
+  height: 100%;
+  width: 0%;
+  background: #4a90e2;
+}
 </style>
 </head>
 
@@ -122,39 +131,32 @@ button:hover {
 
 <div class="container">
 
-  <!-- ================= 左侧栏 ================= -->
   <div class="sidebar">
     <h3>二维码工具</h3>
     <div class="nav" onclick="showQR()">🔗 QR生成</div>
 
     <h3>文件</h3>
     <div class="nav" onclick="loadFiles()">📁 所有文件</div>
-    <div class="nav" onclick="alert('可扩展')">⭐ 收藏</div>
   </div>
 
-  <!-- ================= 主区域 ================= -->
   <div class="main">
 
-    <!-- toolbar -->
     <div class="toolbar">
-      <button onclick="document.getElementById('fileInput').click()">上传</button>
+      <button onclick="fileInput.click()">上传</button>
       <button onclick="deleteSelected()">删除</button>
       <button onclick="loadFiles()">刷新</button>
-
       <input type="file" id="fileInput" multiple class="hidden" />
     </div>
 
-    <!-- content -->
+    <div id="uploadProgress"></div>
+
     <div class="content">
 
-      <!-- ================= QR区域 ================= -->
+      <!-- QR -->
       <div id="qrPage">
         <h2>二维码生成</h2>
 
-        <!-- ✅ 新增：QR拖拽上传区域 -->
-        <div id="qrDropzone" class="dropzone">
-          拖拽文件到这里上传（QR页面）
-        </div>
+        <div id="qrDropzone" class="dropzone">拖拽文件到这里（QR）</div>
 
         <input id="text" placeholder="文本" />
         <button onclick="genText()">生成QR</button>
@@ -167,15 +169,10 @@ button:hover {
         <p id="info"></p>
       </div>
 
-      <!-- ================= 文件管理 ================= -->
+      <!-- files -->
       <div id="filePage" class="hidden">
-
-        <div id="dropzone" class="dropzone">
-          拖拽文件到这里上传
-        </div>
-
+        <div id="dropzone" class="dropzone">拖拽文件上传</div>
         <div id="fileList"></div>
-
       </div>
 
     </div>
@@ -189,48 +186,48 @@ const API = "https://qrapi.mutucun.com";
 let files = [];
 let selected = new Set();
 
-/* ================= 页面切换 ================= */
-function showQR(){
-  document.getElementById("qrPage").classList.remove("hidden");
-  document.getElementById("filePage").classList.add("hidden");
+/* ========== init ========= */
+loadFiles();
+
+/* ========== QR ========== */
+async function genText(){
+  const text = text.value;
+  const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
+  const data = await res.json();
+  qr.src = data.qr;
+  info.innerText = data.data;
 }
 
+async function genUrl(){
+  const url = url.value;
+  const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
+  const data = await res.json();
+  qr.src = data.qr;
+  info.innerText = data.shortUrl;
+}
+
+/* ========== show QR ========== */
+function showQR(){
+  qrPage.classList.remove("hidden");
+  filePage.classList.add("hidden");
+}
+
+/* ========== load files ========== */
 function loadFiles(){
-  document.getElementById("qrPage").classList.add("hidden");
-  document.getElementById("filePage").classList.remove("hidden");
+  qrPage.classList.add("hidden");
+  filePage.classList.remove("hidden");
 
   fetch(`${API}/files`)
     .then(r => r.json())
-    .then(data => {
-      files = data;
+    .then(d => {
+      files = d;
       render();
     });
 }
 
-/* ================= QR ================= */
-async function genText(){
-  const text = document.getElementById("text").value;
-
-  const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
-  const data = await res.json();
-
-  document.getElementById("qr").src = data.qr;
-  document.getElementById("info").innerText = data.data;
-}
-
-async function genUrl(){
-  const url = document.getElementById("url").value;
-
-  const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
-  const data = await res.json();
-
-  document.getElementById("qr").src = data.qr;
-  document.getElementById("info").innerText = data.shortUrl;
-}
-
-/* ================= 渲染文件 ================= */
+/* ========== render ========== */
 function render(){
-  const box = document.getElementById("fileList");
+  const box = fileList;
   box.innerHTML = "";
 
   files.forEach(f => {
@@ -238,96 +235,113 @@ function render(){
     div.className = "file-row";
 
     div.innerHTML = `
-      <input type="checkbox" ${selected.has(f.key) ? "checked":""} onchange="toggle('${f.key}')">
-      <div class="file-name">📄 ${f.name}</div>
-      <div class="badge">preview</div>
+      <input type="checkbox" onchange="toggle('${f.key}')" ${selected.has(f.key)?"checked":""}>
+      <div class="file-name">📄 ${f.name || f.key}</div>
+      <div class="badge">open</div>
     `;
 
-    div.ondblclick = () => window.open(f.url);
+    div.ondblclick = () => window.open(f.fileUrl || f.url);
 
     box.appendChild(div);
   });
 }
 
-/* ================= 选择 ================= */
-function toggle(key){
-  if(selected.has(key)) selected.delete(key);
-  else selected.add(key);
-
-  render();
+/* ========== toggle ========== */
+function toggle(k){
+  selected.has(k) ? selected.delete(k) : selected.add(k);
 }
 
-/* ================= 删除 ================= */
+/* ========== delete ========== */
 async function deleteSelected(){
   await fetch(`${API}/delete`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify([...selected])
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify([...selected])
   });
 
   selected.clear();
   loadFiles();
 }
 
-/* ================= 上传 ================= */
-async function upload(filesList){
-  for(let f of filesList){
-    const fd = new FormData();
-    fd.append("file", f);
+/* ========== upload (fixed + QR support) ========== */
+async function upload(list){
 
-    await fetch(`${API}/upload`, {
-      method: "POST",
-      body: fd
+  uploadProgress.innerHTML = "";
+
+  for(let file of list){
+
+    const item = document.createElement("div");
+    item.className = "progress-item";
+    item.innerHTML = `
+      <div>${file.name}</div>
+      <div class="progress-bar"><div class="progress-bar-inner"></div></div>
+    `;
+
+    const bar = item.querySelector(".progress-bar-inner");
+    uploadProgress.appendChild(item);
+
+    await new Promise((resolve, reject) => {
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${API}/upload`);
+
+      xhr.upload.onprogress = e => {
+        if(e.lengthComputable){
+          bar.style.width = (e.loaded/e.total)*100 + "%";
+        }
+      };
+
+      xhr.onload = () => {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          bar.style.width = "100%";
+
+          if(res.qr){
+            qr.src = res.qr;
+            info.innerText = res.fileUrl;
+          }
+
+          resolve(res);
+        } catch(e){
+          reject(e);
+        }
+      };
+
+      xhr.onerror = reject;
+
+      const fd = new FormData();
+      fd.append("file", file);
+      xhr.send(fd);
     });
   }
 
   loadFiles();
 }
 
-/* ================= input上传 ================= */
-document.getElementById("fileInput").onchange = e => {
-  upload(e.target.files);
-};
+/* ========== input ========== */
+fileInput.onchange = e => upload(e.target.files);
 
-/* ================= 文件管理拖拽 ================= */
-const dropzone = document.getElementById("dropzone");
-
+/* ========== drop files ========== */
 dropzone.ondragover = e => {
   e.preventDefault();
-  dropzone.style.background = "#eaf3ff";
+  dropzone.style.background="#eaf3ff";
 };
-
-dropzone.ondragleave = () => {
-  dropzone.style.background = "white";
-};
-
+dropzone.ondragleave = () => dropzone.style.background="white";
 dropzone.ondrop = e => {
   e.preventDefault();
-  dropzone.style.background = "white";
   upload(e.dataTransfer.files);
 };
 
-/* ================= ⭐ QR页面拖拽上传（新增功能） ================= */
-const qrDropzone = document.getElementById("qrDropzone");
-
-if (qrDropzone) {
-
-  qrDropzone.ondragover = e => {
-    e.preventDefault();
-    qrDropzone.style.background = "#eaf3ff";
-  };
-
-  qrDropzone.ondragleave = () => {
-    qrDropzone.style.background = "white";
-  };
-
-  qrDropzone.ondrop = e => {
-    e.preventDefault();
-    qrDropzone.style.background = "white";
-
-    upload(e.dataTransfer.files);
-  };
-}
+/* QR drop */
+qrDropzone.ondragover = e => {
+  e.preventDefault();
+  qrDropzone.style.background="#eaf3ff";
+};
+qrDropzone.ondragleave = () => qrDropzone.style.background="white";
+qrDropzone.ondrop = e => {
+  e.preventDefault();
+  upload(e.dataTransfer.files);
+};
 
 </script>
 
