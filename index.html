@@ -1,0 +1,43 @@
+<h2>QR 工具</h2>
+
+<input id="text" placeholder="输入文本或URL" />
+<button onclick="genText()">生成文本二维码</button>
+<button onclick="genUrl()">生成短链二维码</button>
+
+<input type="file" id="file" />
+<button onclick="upload()">上传文件</button>
+
+<img id="qr" />
+
+<script>
+const API = "https://你的worker域名";
+
+async function genText() {
+  const text = document.getElementById("text").value;
+  const res = await fetch(`${API}/text?text=${encodeURIComponent(text)}`);
+  const data = await res.json();
+  document.getElementById("qr").src = data.qr;
+}
+
+async function genUrl() {
+  const target = document.getElementById("text").value;
+  const res = await fetch(`${API}/url?target=${encodeURIComponent(target)}`);
+  const data = await res.json();
+  document.getElementById("qr").src = data.qr;
+}
+
+async function upload() {
+  const file = document.getElementById("file").files[0];
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch(`${API}/upload`, {
+    method: "POST",
+    body: fd
+  });
+
+  const data = await res.json();
+  document.getElementById("qr").src = data.qr;
+}
+</script>
