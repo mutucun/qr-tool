@@ -2,127 +2,105 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>QR + Explorer File Manager</title>
+<title>QR + File Manager</title>
 
 <style>
 body {
-  margin: 0;
-  font-family: "Segoe UI", sans-serif;
-  background: #f3f3f3;
+  margin:0;
+  font-family:Segoe UI;
+  background:#f3f3f3;
 }
 
-.container {
-  display: flex;
-  height: 100vh;
-}
+.container { display:flex; height:100vh; }
 
 .sidebar {
-  width: 220px;
-  background: #ffffff;
-  border-right: 1px solid #ddd;
-  padding: 10px;
-}
-
-.sidebar h3 {
-  font-size: 13px;
-  color: #666;
-  margin-top: 15px;
+  width:220px;
+  background:#fff;
+  border-right:1px solid #ddd;
+  padding:10px;
 }
 
 .nav {
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
+  padding:8px;
+  cursor:pointer;
+  border-radius:6px;
 }
 
-.nav:hover { background: #eaeaea; }
+.nav:hover { background:#eaeaea; }
 
 .main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  flex:1;
+  display:flex;
+  flex-direction:column;
 }
 
 .toolbar {
-  height: 50px;
-  background: white;
-  border-bottom: 1px solid #ddd;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  height:50px;
+  background:#fff;
+  border-bottom:1px solid #ddd;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 10px;
 }
 
 button {
-  padding: 6px 10px;
-  border: 1px solid #ccc;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
+  padding:6px 10px;
+  border:1px solid #ccc;
+  background:#fff;
+  border-radius:6px;
+  cursor:pointer;
 }
 
-button:hover { background: #f0f0f0; }
+button:hover { background:#f0f0f0; }
 
 .content {
-  flex: 1;
-  padding: 10px;
-  overflow: auto;
+  flex:1;
+  padding:10px;
+  overflow:auto;
 }
 
 .dropzone {
-  border: 2px dashed #aaa;
-  background: white;
-  padding: 15px;
-  margin-bottom: 10px;
-  text-align: center;
+  border:2px dashed #aaa;
+  background:#fff;
+  padding:15px;
+  margin-bottom:10px;
+  text-align:center;
 }
 
 .file-row {
-  display: flex;
-  align-items: center;
-  padding: 8px;
-  background: white;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  cursor: pointer;
+  display:flex;
+  align-items:center;
+  padding:8px;
+  background:#fff;
+  margin-bottom:6px;
+  border-radius:6px;
 }
 
-.file-row:hover {
-  background: #eaf3ff;
-}
+.file-name { flex:1; margin-left:10px; }
 
-.file-name {
-  flex: 1;
-  margin-left: 10px;
-}
-
-.badge {
-  font-size: 12px;
-  color: #888;
-}
-
-.hidden { display: none; }
+.hidden { display:none; }
 
 .progress-item {
-  background: white;
-  margin: 6px 0;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
+  background:#fff;
+  margin:6px 0;
+  padding:8px;
+  border-radius:6px;
+  border:1px solid #ddd;
 }
 
 .progress-bar {
-  height: 6px;
-  background: #eee;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 6px;
+  height:6px;
+  background:#eee;
+  border-radius:4px;
+  overflow:hidden;
+  margin-top:6px;
 }
 
 .progress-bar-inner {
-  height: 100%;
-  width: 0%;
-  background: #4a90e2;
+  height:100%;
+  width:0%;
+  background:#4a90e2;
 }
 </style>
 </head>
@@ -133,10 +111,13 @@ button:hover { background: #f0f0f0; }
 
   <div class="sidebar">
     <h3>二维码工具</h3>
-    <div class="nav" onclick="showQR()">🔗 QR生成</div>
+    <div class="nav" onclick="showQR()">QR生成</div>
+
+    <h3>模式</h3>
+    <button onclick="toggleMode()" id="modeBtn">模式：单二维码</button>
 
     <h3>文件</h3>
-    <div class="nav" onclick="loadFiles()">📁 所有文件</div>
+    <div class="nav" onclick="loadFiles()">文件管理</div>
   </div>
 
   <div class="main">
@@ -144,7 +125,7 @@ button:hover { background: #f0f0f0; }
     <div class="toolbar">
       <button onclick="fileInput.click()">上传</button>
       <button onclick="deleteSelected()">删除</button>
-      <button onclick="loadFiles()">刷新</button>
+      <button onclick="refreshFiles()">刷新</button>
       <input type="file" id="fileInput" multiple class="hidden" />
     </div>
 
@@ -152,26 +133,19 @@ button:hover { background: #f0f0f0; }
 
     <div class="content">
 
-      <!-- QR -->
       <div id="qrPage">
         <h2>二维码生成</h2>
 
-        <div id="qrDropzone" class="dropzone">拖拽文件到这里（QR）</div>
+        <div id="qrDropzone" class="dropzone">拖拽上传（QR）</div>
 
-        <input id="text" placeholder="文本" />
-        <button onclick="genText()">生成QR</button>
-
-        <input id="url" placeholder="URL" />
-        <button onclick="genUrl()">短链QR</button>
-
-        <hr />
         <img id="qr" style="width:200px;height:200px;" />
         <p id="info"></p>
+
+        <div id="multiQRBox"></div>
       </div>
 
-      <!-- files -->
       <div id="filePage" class="hidden">
-        <div id="dropzone" class="dropzone">拖拽文件上传</div>
+        <div id="dropzone" class="dropzone">拖拽上传文件</div>
         <div id="fileList"></div>
       </div>
 
@@ -183,92 +157,66 @@ button:hover { background: #f0f0f0; }
 
 const API = "https://qrapi.mutucun.com";
 
+let qrMode = "single";
 let files = [];
 let selected = new Set();
 
-/* ========== init ========= */
-loadFiles();
+const $ = (id)=>document.getElementById(id);
 
-/* ========== QR ========== */
-async function genText(){
-  const text = text.value;
-  const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
-  const data = await res.json();
-  qr.src = data.qr;
-  info.innerText = data.data;
+/* ================= mode ================= */
+function toggleMode(){
+  qrMode = qrMode === "single" ? "group" : "single";
+  $("modeBtn").innerText =
+    "模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
 }
 
-async function genUrl(){
-  const url = url.value;
-  const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
-  const data = await res.json();
-  qr.src = data.qr;
-  info.innerText = data.shortUrl;
-}
+/* ================= QR ================= */
+function showQRResult(res){
 
-/* ========== show QR ========== */
-function showQR(){
-  qrPage.classList.remove("hidden");
-  filePage.classList.add("hidden");
-}
+  const url = res.groupUrl || res.fileUrl;
 
-/* ========== load files ========== */
-function loadFiles(){
-  qrPage.classList.add("hidden");
-  filePage.classList.remove("hidden");
+  if(qrMode === "single"){
+    $("qr").src = res.qr;
+    $("info").innerText = url;
 
-  fetch(`${API}/files`)
-    .then(r => r.json())
-    .then(d => {
-      files = d;
-      render();
-    });
-}
+    // ❗关键修复：single模式也清理历史
+    $("multiQRBox").innerHTML = "";
+  } else {
+    // ❗关键修复：group模式每次都重置
+    $("qr").src = res.qr;
+    $("info").innerText = url;
 
-/* ========== render ========== */
-function render(){
-  const box = fileList;
-  box.innerHTML = "";
-
-  files.forEach(f => {
-    const div = document.createElement("div");
-    div.className = "file-row";
-
-    div.innerHTML = `
-      <input type="checkbox" onchange="toggle('${f.key}')" ${selected.has(f.key)?"checked":""}>
-      <div class="file-name">📄 ${f.name || f.key}</div>
-      <div class="badge">open</div>
+    $("multiQRBox").innerHTML = `
+      <div>${url}</div>
+      <img src="${res.qr}">
     `;
-
-    div.ondblclick = () => window.open(f.fileUrl || f.url);
-
-    box.appendChild(div);
-  });
+  }
 }
 
-/* ========== toggle ========== */
-function toggle(k){
-  selected.has(k) ? selected.delete(k) : selected.add(k);
-}
-
-/* ========== delete ========== */
-async function deleteSelected(){
-  await fetch(`${API}/delete`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify([...selected])
-  });
-
-  selected.clear();
-  loadFiles();
-}
-
-/* ========== upload (fixed + QR support) ========== */
+/* ================= upload ================= */
 async function upload(list){
 
-  uploadProgress.innerHTML = "";
+  $("uploadProgress").innerHTML = "";
 
-  for(let file of list){
+  // ================= GROUP（真正集合二维码） =================
+  if(qrMode === "group" && list.length > 1){
+
+    const fd = new FormData();
+    for(const f of list) fd.append("file", f);
+
+    const res = await fetch(`${API}/upload-group`, {
+      method:"POST",
+      body: fd
+    });
+
+    const data = await res.json();
+    showQRResult(data);
+    refreshFiles();
+    return;
+  }
+
+  // ================= SINGLE（逐个文件） =================
+  for(const file of list){
 
     const item = document.createElement("div");
     item.className = "progress-item";
@@ -278,33 +226,32 @@ async function upload(list){
     `;
 
     const bar = item.querySelector(".progress-bar-inner");
-    uploadProgress.appendChild(item);
+    $("uploadProgress").appendChild(item);
 
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve,reject)=>{
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${API}/upload`);
 
-      xhr.upload.onprogress = e => {
+      xhr.upload.onprogress = e=>{
         if(e.lengthComputable){
           bar.style.width = (e.loaded/e.total)*100 + "%";
         }
       };
 
-      xhr.onload = () => {
-        try {
-          const res = JSON.parse(xhr.responseText);
-          bar.style.width = "100%";
+      xhr.onload = ()=>{
+        const res = JSON.parse(xhr.responseText);
+        bar.style.width = "100%";
 
-          if(res.qr){
-            qr.src = res.qr;
-            info.innerText = res.fileUrl;
-          }
+        // ❗关键修复：不覆盖单个，而是逐个追加
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <div>${res.fileUrl}</div>
+          <img src="${res.qr}" width="120">
+        `;
+        $("multiQRBox").appendChild(div);
 
-          resolve(res);
-        } catch(e){
-          reject(e);
-        }
+        resolve(res);
       };
 
       xhr.onerror = reject;
@@ -315,33 +262,88 @@ async function upload(list){
     });
   }
 
-  loadFiles();
+  refreshFiles();
 }
 
-/* ========== input ========== */
-fileInput.onchange = e => upload(e.target.files);
+/* ================= files ================= */
+function loadFiles(){
+  $("qrPage").classList.add("hidden");
+  $("filePage").classList.remove("hidden");
+  refreshFiles();
+}
 
-/* ========== drop files ========== */
-dropzone.ondragover = e => {
-  e.preventDefault();
-  dropzone.style.background="#eaf3ff";
-};
-dropzone.ondragleave = () => dropzone.style.background="white";
-dropzone.ondrop = e => {
-  e.preventDefault();
-  upload(e.dataTransfer.files);
-};
+function refreshFiles(){
+  fetch(`${API}/files`)
+    .then(r=>r.json())
+    .then(d=>{
+      files = d;
+      render();
+    });
+}
 
-/* QR drop */
-qrDropzone.ondragover = e => {
-  e.preventDefault();
-  qrDropzone.style.background="#eaf3ff";
-};
-qrDropzone.ondragleave = () => qrDropzone.style.background="white";
-qrDropzone.ondrop = e => {
-  e.preventDefault();
-  upload(e.dataTransfer.files);
-};
+function render(){
+  $("fileList").innerHTML = "";
+
+  files.forEach(f=>{
+    const div=document.createElement("div");
+    div.className="file-row";
+
+    div.innerHTML=`
+      <input type="checkbox" onchange="toggle('${f.key}')">
+      <div class="file-name">${f.name}</div>
+      <div>open</div>
+    `;
+
+    div.ondblclick=()=>window.open(f.url);
+    $("fileList").appendChild(div);
+  });
+}
+
+function toggle(k){
+  selected.has(k)?selected.delete(k):selected.add(k);
+}
+
+async function deleteSelected(){
+  await fetch(`${API}/delete`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify([...selected])
+  });
+
+  selected.clear();
+  refreshFiles();
+}
+
+/* ================= drag ================= */
+function bind(id){
+  const el=$(id);
+  if(!el) return;
+
+  el.ondragover=e=>{
+    e.preventDefault();
+    el.style.background="#eaf3ff";
+  };
+
+  el.ondragleave=()=>el.style.background="#fff";
+
+  el.ondrop=e=>{
+    e.preventDefault();
+    el.style.background="#fff";
+    upload(e.dataTransfer.files);
+  };
+}
+
+bind("dropzone");
+bind("qrDropzone");
+
+/* ================= input ================= */
+fileInput.onchange=e=>upload(e.target.files);
+
+/* ================= page ================= */
+function showQR(){
+  $("qrPage").classList.remove("hidden");
+  $("filePage").classList.add("hidden");
+}
 
 </script>
 
