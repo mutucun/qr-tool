@@ -2,76 +2,218 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>QR Tool</title>
+  <title>QR + File Manager</title>
+
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+
+    .hidden { display: none; }
+
+    .file {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid #ddd;
+      padding: 8px;
+      margin: 6px 0;
+    }
+
+    .dropzone {
+      border: 2px dashed #999;
+      padding: 20px;
+      margin: 10px 0;
+      text-align: center;
+    }
+
+    button { margin-left: 6px; }
+  </style>
 </head>
 
 <body>
+
+<!-- ================= 主界面 ================= -->
+<div id="home">
+
   <h2>二维码工具</h2>
+
+  <button onclick="switchPage('file')">进入文件管理</button>
 
   <hr />
 
-  <h3>1. 文本生成二维码</h3>
+  <h3>文本生成二维码</h3>
   <input id="text" placeholder="输入文本" />
   <button onclick="genText()">生成</button>
 
   <hr />
 
-  <h3>2. URL生成短链二维码</h3>
+  <h3>URL生成短链二维码</h3>
   <input id="url" placeholder="输入URL" />
   <button onclick="genUrl()">生成</button>
 
   <hr />
 
-  <h3>3. 文件上传生成二维码</h3>
-  <input type="file" id="file" />
-  <button onclick="upload()">上传</button>
+  <h3>结果</h3>
+  <img id="qr" style="width:200px;height:200px;" />
+  <p id="info"></p>
+
+</div>
+
+<!-- ================= 文件管理界面 ================= -->
+<div id="filePage" class="hidden">
+
+  <h2>文件管理</h2>
+
+  <button onclick="switchPage('home')">返回主页</button>
 
   <hr />
 
-  <h3>结果：</h3>
-  <img id="qr" style="width:200px;height:200px;" />
+  <!-- 拖拽上传 -->
+  <div id="dropzone" class="dropzone">
+    拖拽文件到这里上传
+  </div>
 
-  <p id="info"></p>
+  <input type="file" id="fileInput" multiple />
+  <button onclick="uploadFiles()">上传文件</button>
 
-  <script>
-    const API = "https://qrapi.mutucun.com";
+  <hr />
 
-    async function genText() {
-      const text = document.getElementById("text").value;
+  <button onclick="deleteSelected()">删除选中文件</button>
 
-      const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
-      const data = await res.json();
+  <div id="fileList"></div>
 
-      document.getElementById("qr").src = data.qr;
-      document.getElementById("info").innerText = data.data;
+</div>
+
+<script>
+const API = "https://qrapi.mutucun.com";
+
+let files = [];
+let selected = new Set();
+
+/* ================= 页面切换 ================= */
+function switchPage(page){
+  document.getElementById("home").classList.add("hidden");
+  document.getElementById("filePage").classList.add("hidden");
+
+  document.getElementById(page === "home" ? "home" : "filePage")
+    .classList.remove("hidden");
+
+  if(page === "file") loadFiles();
+}
+
+/* ================= QR功能 ================= */
+async function genText(){
+  const text = document.getElementById("text").value;
+
+  const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
+  const data = await res.json();
+
+  document.getElementById("qr").src = data.qr;
+  document.getElementById("info").innerText = data.data;
+}
+
+async function genUrl(){
+  const url = document.getElementById("url").value;
+
+  const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
+  const data = await res.json();
+
+  document.getElementById("qr").src = data.qr;
+  document.getElementById("info").innerText = data.shortUrl;
+}
+
+/* ================= 文件上传 ================= */
+async function uploadFiles(fileList){
+  const filesToUpload = fileList || document.getElementById("fileInput").files;
+
+  for (let file of filesToUpload) {
+    const fd = new FormData();
+    fd.append("file", file);
+
+    await fetch(`${API}/upload`, {
+      method: "POST",
+      body: fd
+    });
+  }
+
+  loadFiles();
+}
+
+/* ================= 文件列表 ================= */
+async function loadFiles(){
+  const res = await fetch(`${API}/files`);
+  files = await res.json();
+
+  renderFiles();
+}
+
+/* ================= 渲染列表 ================= */
+function renderFiles(){
+  const box = document.getElementById("fileList");
+  box.innerHTML = "";
+
+  files.forEach(f => {
+    const div = document.createElement("div");
+    div.className = "file";
+
+    div.innerHTML = `
+      <input type="checkbox" onchange="toggle('${f.key}')">
+      <span>${f.name}</span>
+      <button onclick="preview('${f.url}')">预览</button>
+      <button onclick="share('${f.url}')">分享</button>
+    `;
+
+    box.appendChild(div);
+  });
+}
+
+/* ================= 选择 ================= */
+function toggle(key){
+  if(selected.has(key)) selected.delete(key);
+  else selected.add(key);
+}
+
+/* ================= 删除 ================= */
+async function deleteSelected(){
+  await fetch(`${API}/delete`, {
+    method: "POST",
+    body: JSON.stringify([...selected]),
+    headers: {
+      "Content-Type": "application/json"
     }
+  });
 
-    async function genUrl() {
-      const url = document.getElementById("url").value;
+  selected.clear();
+  loadFiles();
+}
 
-      const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
-      const data = await res.json();
+/* ================= 预览 ================= */
+function preview(url){
+  window.open(url, "_blank");
+}
 
-      document.getElementById("qr").src = data.qr;
-      document.getElementById("info").innerText = data.shortUrl;
-    }
+/* ================= 分享 ================= */
+function share(url){
+  prompt("分享链接：", url);
+}
 
-    async function upload() {
-      const file = document.getElementById("file").files[0];
+/* ================= 拖拽上传 ================= */
+const dropzone = document.getElementById("dropzone");
 
-      const fd = new FormData();
-      fd.append("file", file);
+dropzone.ondragover = e => {
+  e.preventDefault();
+  dropzone.style.background = "#f0f0f0";
+};
 
-      const res = await fetch(`${API}/upload`, {
-        method: "POST",
-        body: fd
-      });
+dropzone.ondragleave = () => {
+  dropzone.style.background = "";
+};
 
-      const data = await res.json();
+dropzone.ondrop = e => {
+  e.preventDefault();
+  dropzone.style.background = "";
+  uploadFiles(e.dataTransfer.files);
+};
+</script>
 
-      document.getElementById("qr").src = data.qr;
-      document.getElementById("info").innerText = data.fileUrl;
-    }
-  </script>
 </body>
 </html>
