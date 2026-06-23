@@ -1,43 +1,77 @@
-<h2>QR 工具</h2>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>QR Tool</title>
+</head>
 
-<input id="text" placeholder="输入文本或URL" />
-<button onclick="genText()">生成文本二维码</button>
-<button onclick="genUrl()">生成短链二维码</button>
+<body>
+  <h2>二维码工具</h2>
 
-<input type="file" id="file" />
-<button onclick="upload()">上传文件</button>
+  <hr />
 
-<img id="qr" />
+  <h3>1. 文本生成二维码</h3>
+  <input id="text" placeholder="输入文本" />
+  <button onclick="genText()">生成</button>
 
-<script>
-const API = "https://你的worker域名";
+  <hr />
 
-async function genText() {
-  const text = document.getElementById("text").value;
-  const res = await fetch(`${API}/text?text=${encodeURIComponent(text)}`);
-  const data = await res.json();
-  document.getElementById("qr").src = data.qr;
-}
+  <h3>2. URL生成短链二维码</h3>
+  <input id="url" placeholder="输入URL" />
+  <button onclick="genUrl()">生成</button>
 
-async function genUrl() {
-  const target = document.getElementById("text").value;
-  const res = await fetch(`${API}/url?target=${encodeURIComponent(target)}`);
-  const data = await res.json();
-  document.getElementById("qr").src = data.qr;
-}
+  <hr />
 
-async function upload() {
-  const file = document.getElementById("file").files[0];
+  <h3>3. 文件上传生成二维码</h3>
+  <input type="file" id="file" />
+  <button onclick="upload()">上传</button>
 
-  const fd = new FormData();
-  fd.append("file", file);
+  <hr />
 
-  const res = await fetch(`${API}/upload`, {
-    method: "POST",
-    body: fd
-  });
+  <h3>结果：</h3>
+  <img id="qr" style="width:200px;height:200px;" />
 
-  const data = await res.json();
-  document.getElementById("qr").src = data.qr;
-}
-</script>
+  <p id="info"></p>
+
+  <script>
+    const API = "https://你的worker域名.workers.dev";
+
+    async function genText() {
+      const text = document.getElementById("text").value;
+
+      const res = await fetch(`${API}/text?data=${encodeURIComponent(text)}`);
+      const data = await res.json();
+
+      document.getElementById("qr").src = data.qr;
+      document.getElementById("info").innerText = data.data;
+    }
+
+    async function genUrl() {
+      const url = document.getElementById("url").value;
+
+      const res = await fetch(`${API}/short?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+
+      document.getElementById("qr").src = data.qr;
+      document.getElementById("info").innerText = data.shortUrl;
+    }
+
+    async function upload() {
+      const file = document.getElementById("file").files[0];
+
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch(`${API}/upload`, {
+        method: "POST",
+        body: fd
+      });
+
+      const data = await res.json();
+
+      document.getElementById("qr").src = data.qr;
+      document.getElementById("info").innerText = data.fileUrl;
+    }
+  </script>
+</body>
+</html>
