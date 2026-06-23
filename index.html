@@ -102,6 +102,13 @@ button:hover { background:#f0f0f0; }
   width:0%;
   background:#4a90e2;
 }
+
+#previewBox {
+  margin-top:10px;
+  padding:10px;
+  background:#fff;
+  border-radius:6px;
+}
 </style>
 </head>
 
@@ -126,6 +133,10 @@ button:hover { background:#f0f0f0; }
       <button onclick="fileInput.click()">上传</button>
       <button onclick="deleteSelected()">删除</button>
       <button onclick="refreshFiles()">刷新</button>
+
+      <!-- ⭐ 新增 -->
+      <button onclick="toggleSelectAll()">全选</button>
+
       <input type="file" id="fileInput" multiple class="hidden" />
     </div>
 
@@ -133,6 +144,7 @@ button:hover { background:#f0f0f0; }
 
     <div class="content">
 
+      <!-- QR -->
       <div id="qrPage">
         <h2>二维码生成</h2>
 
@@ -144,9 +156,14 @@ button:hover { background:#f0f0f0; }
         <div id="multiQRBox"></div>
       </div>
 
+      <!-- FILES -->
       <div id="filePage" class="hidden">
         <div id="dropzone" class="dropzone">拖拽上传文件</div>
+
         <div id="fileList"></div>
+
+        <!-- ⭐ 预览区 -->
+        <div id="previewBox"></div>
       </div>
 
     </div>
@@ -178,14 +195,10 @@ function showQRResult(res){
   if(qrMode === "single"){
     $("qr").src = res.qr;
     $("info").innerText = url;
-
-    // ❗关键修复：single模式也清理历史
     $("multiQRBox").innerHTML = "";
   } else {
-    // ❗关键修复：group模式每次都重置
     $("qr").src = res.qr;
     $("info").innerText = url;
-
     $("multiQRBox").innerHTML = `
       <div>${url}</div>
       <img src="${res.qr}">
@@ -198,7 +211,6 @@ async function upload(list){
 
   $("uploadProgress").innerHTML = "";
 
-  // ================= GROUP（真正集合二维码） =================
   if(qrMode === "group" && list.length > 1){
 
     const fd = new FormData();
@@ -215,7 +227,6 @@ async function upload(list){
     return;
   }
 
-  // ================= SINGLE（逐个文件） =================
   for(const file of list){
 
     const item = document.createElement("div");
@@ -243,7 +254,6 @@ async function upload(list){
         const res = JSON.parse(xhr.responseText);
         bar.style.width = "100%";
 
-        // ❗关键修复：不覆盖单个，而是逐个追加
         const div = document.createElement("div");
         div.innerHTML = `
           <div>${res.fileUrl}</div>
@@ -281,6 +291,7 @@ function refreshFiles(){
     });
 }
 
+/* ================= render + preview ================= */
 function render(){
   $("fileList").innerHTML = "";
 
@@ -289,9 +300,9 @@ function render(){
     div.className="file-row";
 
     div.innerHTML=`
-      <input type="checkbox" onchange="toggle('${f.key}')">
+      <input type="checkbox" onchange="toggle('${f.key}', this)">
       <div class="file-name">${f.name}</div>
-      <div>open</div>
+      <button onclick="previewFile('${f.url}')">预览</button>
     `;
 
     div.ondblclick=()=>window.open(f.url);
@@ -299,10 +310,59 @@ function render(){
   });
 }
 
-function toggle(k){
-  selected.has(k)?selected.delete(k):selected.add(k);
+function toggle(k, el){
+  if(el.checked) selected.add(k);
+  else selected.delete(k);
 }
 
+/* ================= 全选 ================= */
+function toggleSelectAll(){
+  const boxes = document.querySelectorAll("#fileList input[type=checkbox]");
+
+  const shouldSelect = selected.size !== files.length;
+
+  selected.clear();
+
+  boxes.forEach((b,i)=>{
+    b.checked = shouldSelect;
+    if(shouldSelect) selected.add(files[i].key);
+  });
+}
+
+/* ================= 预览 ================= */
+function previewFile(url){
+
+  const box = $("previewBox");
+  box.innerHTML = "加载中...";
+
+  fetch(url)
+    .then(r=>r.blob())
+    .then(blob=>{
+
+      if(blob.type.startsWith("image/")){
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(blob);
+        img.style.maxWidth = "300px";
+        box.innerHTML = "";
+        box.appendChild(img);
+        return;
+      }
+
+      if(blob.type.startsWith("text/")){
+        const reader = new FileReader();
+        reader.onload = ()=>{
+          box.innerHTML =
+            `<pre style="white-space:pre-wrap">${reader.result.slice(0,2000)}</pre>`;
+        };
+        reader.readAsText(blob);
+        return;
+      }
+
+      box.innerHTML = `<a href="${url}" target="_blank">无法预览，点击下载</a>`;
+    });
+}
+
+/* ================= delete ================= */
 async function deleteSelected(){
   await fetch(`${API}/delete`,{
     method:"POST",
