@@ -63,6 +63,7 @@ body {
   display: flex;
   flex-direction: column;
   background: #ffffff;
+  position: relative;
 }
 
 /* Win11 顶部工具栏 */
@@ -125,6 +126,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 15px;
   padding: 5px;
+  min-height: 300px; /* 确保空白区域也能触发右键 */
 }
 
 .file-card {
@@ -221,6 +223,57 @@ button.win11-btn.primary:hover { background: #005a1a; }
   margin-top: 20px;
   border-radius: 6px;
 }
+
+/* ================= ⭐ 新增样式：Win11 右键菜单样式 ================= */
+.context-menu {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(15px);
+  border: 1px solid #dfdfdf;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 6px 4px;
+  min-width: 160px;
+  z-index: 9999;
+  display: none;
+}
+
+.context-menu-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: #e5e5e5;
+  margin: 4px 6px;
+}
+
+/* 全局弱提示通知 */
+.toast-notice {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #333;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
 </style>
 </head>
 
@@ -241,7 +294,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
     </button>
   </div>
 
-  <div class="main">
+  <div class="main" id="mainRightArea">
     <div class="toolbar">
       <div class="action-group">
         <button class="win11-btn primary" onclick="fileInput.click()">➕ 上传新文件</button>
@@ -287,12 +340,16 @@ button.win11-btn.primary:hover { background: #005a1a; }
 
         <div class="preview-pane">
           <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🔍 属性与即时预览面板</strong>
-          <div id="previewBox" style="font-size: 13px; color: #555;">未选中任何可预览的文件。在上方文件双击可打开直链，单击右侧按钮可加载预览。</div>
+          <div id="previewBox" style="font-size: 13px; color: #555;">未选中任何可预览的文件。在上方文件双击可打开直链，或右键选择对应操作。</div>
         </div>
       </div>
     </div>
+
+    <div id="winContextMenu" class="context-menu"></div>
   </div>
 </div>
+
+<div id="toast" class="toast-notice"></div>
 
 <script>
 const API = "https://qrapi.mutucun.com";
@@ -300,8 +357,16 @@ const API = "https://qrapi.mutucun.com";
 let qrMode = "single";
 let files = [];
 let selected = new Set();
+let currentRightClickedKey = null; // 当前右键点击的目标文件 Key
 
 const $ = (id) => document.getElementById(id);
+
+function showToast(msg) {
+  const t = $("toast");
+  t.innerText = msg;
+  t.style.opacity = 1;
+  setTimeout(() => t.style.opacity = 0, 2000);
+}
 
 function getFileIcon(filename) {
   const ext = filename.split('.').pop().toLowerCase();
@@ -345,6 +410,7 @@ function toggleMode() {
   $("modeBtn").innerText = "⚖️ 模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
 }
 
+/* ================= 资源管理器核心网格渲染 ================= */
 function renderGrid() {
   const grid = $("fileGrid");
   grid.innerHTML = "";
@@ -357,22 +423,26 @@ function renderGrid() {
   files.forEach(f => {
     const card = document.createElement("div");
     card.className = "file-card";
+    card.setAttribute("data-key", f.key);
+    card.setAttribute("data-url", f.url);
     if (selected.has(f.key)) card.classList.add("selected");
 
     card.innerHTML = `
       <input type="checkbox" class="file-checkbox" ${selected.has(f.key) ? 'checked' : ''}>
       <span class="file-icon">${getFileIcon(f.name)}</span>
       <div class="file-card-name" title="${f.name}">${f.name}</div>
-      <button class="win11-btn" style="font-size:11px; padding:2px 4px; margin-top:4px;" onclick="event.stopPropagation(); previewFile('${f.url}')">🔬 预览</button>
     `;
 
-    card.onclick = () => {
+    // 左键单击选中逻辑
+    card.onclick = (e) => {
+      e.stopPropagation();
       if (selected.has(f.key)) { selected.delete(f.key); card.classList.remove("selected"); } 
       else { selected.add(f.key); card.classList.add("selected"); }
       updateSelectionUI();
     };
 
-    card.ondblclick = () => { window.open(f.url); };
+    // 左键双击打开直链
+    card.ondblclick = (e) => { e.stopPropagation(); window.open(f.url); };
     grid.appendChild(card);
   });
   updateSelectionUI();
@@ -393,6 +463,92 @@ function toggleSelectAll() {
   renderGrid();
 }
 
+/* ================= ⭐ 新增功能：Win11 右键菜单控制核心 ================= */
+const menu = $("winContextMenu");
+
+// 监听整个右侧区域的右键点击
+$("mainRightArea").addEventListener("contextmenu", function(e) {
+  // 如果当前处于二维码生成主页，允许默认右键
+  if (!$("filePage").classList.contains("hidden") === false) return;
+
+  e.preventDefault(); // 阻止浏览器原生右键
+
+  const card = e.target.closest(".file-card");
+  
+  if (card) {
+    // 1. 如果点在文件卡片上
+    currentRightClickedKey = card.getAttribute("data-key");
+    const fileUrl = card.getAttribute("data-url");
+    
+    // 自动将当前右键项变为选中状态
+    if (!selected.has(currentRightClickedKey)) {
+      selected.add(currentRightClickedKey);
+      card.classList.add("selected");
+      updateSelectionUI();
+    }
+
+    menu.innerHTML = `
+      <div class="context-menu-item" onclick="contextCopyLink('${fileUrl}')">🔗 复制文件直链</div>
+      <div class="context-menu-item" onclick="contextShowQR('${fileUrl}')">📱 显示此文件二维码</div>
+      <div class="context-menu-item" onclick="contextPreview('${fileUrl}')">🔬 即时加载预览</div>
+      <div class="context-menu-separator"></div>
+      <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 永久删除项目</div>
+    `;
+  } else {
+    // 2. 如果点在空白区域
+    currentRightClickedKey = null;
+    menu.innerHTML = `
+      <div class="context-menu-item" onclick="fileInput.click()">➕ 上传新文件</div>
+      <div class="context-menu-item" onclick="refreshFiles()">🔄 刷新目录视图</div>
+      <div class="context-menu-separator"></div>
+      <div class="context-menu-item" onclick="toggleSelectAll()">☑️ 全选 / 反选</div>
+    `;
+  }
+
+  // 定位并调出菜单
+  menu.style.left = e.clientX - $("mainRightArea").getBoundingClientRect().left + "px";
+  menu.style.top = e.clientY - $("mainRightArea").getBoundingClientRect().top + "px";
+  menu.style.display = "block";
+});
+
+// 单击任意空白处，关闭右键菜单
+document.addEventListener("click", () => menu.style.display = "none");
+
+/* 右键菜单各个选项绑定的前端原子动作 */
+function contextCopyLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    showToast("📋 直链已成功复制到剪贴板！");
+  }).catch(() => showToast("❌ 复制失败，请检查浏览器权限"));
+}
+
+function contextShowQR(url) {
+  // 切换到二维码视图并渲染该文件的独立二维码
+  switchPage('qr');
+  $("textInput").value = url;
+  generateTextQR();
+  showToast("📱 已在主面板中离线转换该文件二维码");
+}
+
+function contextPreview(url) {
+  previewFile(url);
+}
+
+async function contextDeleteOne() {
+  if (!currentRightClickedKey) return;
+  if (!confirm("确定要在 Cloudflare R2 中永久抹除该项目吗？")) return;
+  
+  await fetch(`${API}/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([currentRightClickedKey])
+  });
+  selected.delete(currentRightClickedKey);
+  refreshFiles();
+  showToast("🗑️ 项目已移除");
+}
+
+
+/* ================= 异步上传管理逻辑 ================= */
 async function upload(list) {
   if (list.length === 0) return;
   $("uploadProgress").innerHTML = "";
@@ -439,7 +595,6 @@ async function upload(list) {
           const res = JSON.parse(xhr.responseText);
           bar.style.width = "100%";
 
-          // 核心点：强制使用后端返回的标准拼接格式，确保路径对齐
           const absoluteUrl = `${API}/file/${encodeURIComponent(res.key)}`;
 
           const card = document.createElement("div");
@@ -477,7 +632,7 @@ function previewFile(url) {
     .then(r => r.blob())
     .then(blob => {
       if (blob.type.startsWith("image/")) {
-        box.innerHTML = `<img src="${URL.createObjectURL(blob)}" style="max-width: 240px; border-radius:4px;">`;
+        box.innerHTML = `<img src="${URL.createObjectURL(blob)}" style="max-width: 240px; border-radius:4px; max-height: 200px;">`;
       } else if (blob.type.startsWith("text/")) {
         const reader = new FileReader();
         reader.onload = () => {
@@ -503,6 +658,7 @@ async function deleteSelected() {
   });
   selected.clear();
   refreshFiles();
+  showToast("🗑️ 批量项目已移除");
 }
 
 function bindDrag(id) {
