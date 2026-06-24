@@ -335,6 +335,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
       <div class="action-group" id="toolbarActionGroup">
         <button class="win11-btn primary" onclick="fileInput.click()">➕ 上传新文件</button>
         <button class="win11-btn" onclick="openCreateFolderDialog()">📁 新建文件夹</button>
+        <button class="win11-btn" onclick="renameSelected()">✏️ 重命名</button>
         <button class="win11-btn" onclick="deleteSelected()" style="color: #d13438;">❌ 批量删除</button>
         <button class="win11-btn" onclick="refreshFiles()">🔄 刷新视图</button>
         <button class="win11-btn" onclick="toggleSelectAll()">☑️ 全选/反选</button>
@@ -471,7 +472,6 @@ function handleGridDblClick(e) {
   }
 }
 
-// ✨ 修复优化：在二维码视图下，将大工具栏（Toolbar）彻底彻底设为不占空间的隐藏状态
 function switchPage(page) {
   activePage = page;
   if(page === 'qr') {
@@ -480,8 +480,6 @@ function switchPage(page) {
     $("menu-qr").classList.add("active");
     $("menu-files").classList.remove("active");
     $("address-path").style.visibility = "hidden";
-    
-    // 隐藏大工具栏，消除多余物理高度占位，内容自然置顶
     $("topToolbar").classList.add("hidden");
   } else {
     $("qrPage").classList.add("hidden");
@@ -489,8 +487,6 @@ function switchPage(page) {
     $("menu-qr").classList.remove("active");
     $("menu-files").classList.add("active");
     $("address-path").style.visibility = "visible";
-    
-    // 资源管理器恢复显示大工具栏
     $("topToolbar").classList.remove("hidden");
     refreshFiles();
   }
@@ -585,14 +581,18 @@ $("mainRightArea").addEventListener("contextmenu", function(e) {
     currentRightClickedItem = f;
     
     if (!selected.has(f.key)) {
+      selected.clear(); // 单选右键
       selected.add(f.key);
+      document.querySelectorAll('.file-card').forEach(c => c.classList.remove("selected"));
       cardEl.classList.add("selected");
       updateSelectionUI();
     }
 
+    // ✨ 右键菜单增加“✏️ 重命名项目”
     if (f.type === "folder") {
       menu.innerHTML = `
         <div class="context-menu-item" onclick="currentPrefix='${f.key}'; refreshFiles();">🚪 进入文件夹</div>
+        <div class="context-menu-item" onclick="contextRenameItem()">✏️ 重命名文件夹</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 深度连带删除目录</div>
       `;
@@ -600,6 +600,7 @@ $("mainRightArea").addEventListener("contextmenu", function(e) {
       menu.innerHTML = `
         <div class="context-menu-item" onclick="contextCopyLink('${f.url}')">🔗 复制文件直链</div>
         <div class="context-menu-item" onclick="contextShowQR('${f.url}')">📱 显示此文件二维码</div>
+        <div class="context-menu-item" onclick="contextRenameItem()">✏️ 重命名文件</div>
         <div class="context-menu-item" onclick="previewFile('${f.url}', ${f.size})">🔬 即时加载预览</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 永久删除项目</div>
@@ -633,6 +634,53 @@ function contextShowQR(url) {
   $("textInput").value = url;
   generateTextQR();
   showToast("📱 已生成专属二维码卡片");
+}
+
+// ✨ 右键菜单触发重命名
+function contextRenameItem() {
+  if (!currentRightClickedItem) return;
+  executeRenameWorkflow(currentRightClickedItem.key, currentRightClickedItem.name);
+}
+
+// ✨ 工具栏触发重命名
+function renameSelected() {
+  if (selected.size !== 1) { alert("请选择单个文件或文件夹进行重命名！"); return; }
+  const selectedKey = [...selected][0];
+  const targetItem = files.find(f => f.key === selectedKey);
+  if (targetItem) {
+    executeRenameWorkflow(targetItem.key, targetItem.name);
+  }
+}
+
+// ✨ 核心重命名处理工作流
+async function executeRenameWorkflow(oldKey, oldName) {
+  const newName = prompt(`请输入 [ ${oldName} ] 的新名称:`, oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+  showToast("⏳ 正在重命名...");
+  
+  try {
+    const res = await fetch(`${API}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        oldKey: oldKey,
+        newName: newName.trim(),
+        currentPrefix: currentPrefix
+      })
+    });
+
+    if (res.ok) {
+      showToast("✏️ 重命名成功！");
+      selected.clear();
+      refreshFiles();
+    } else {
+      const errText = await res.text();
+      alert("重命名失败: " + errText);
+    }
+  } catch (err) {
+    showToast("❌ 请求发送失败");
+  }
 }
 
 async function contextDeleteOne() {
@@ -798,7 +846,6 @@ function bindDrag(id) {
 bindDrag("dropzone");
 bindDrag("qrDropzone");
 
-// 确保容器外的点击穿透到隐藏 input
 $("qrDropzone").addEventListener("click", (e) => {
   if(e.target === $("qrDropzone")) $("fileInput").click();
 });
@@ -808,7 +855,6 @@ $("dropzone").addEventListener("click", (e) => {
 
 $("fileInput").onchange = e => upload(e.target.files);
 
-// 初始化加载二维码页面
 switchPage('qr');
 </script>
 
