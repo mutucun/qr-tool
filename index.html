@@ -135,7 +135,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 15px;
   padding: 5px;
-  min-height: 300px;
+  min-height: 350px;
 }
 
 .file-card {
@@ -190,6 +190,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
   opacity: 1;
 }
 
+/* 增强的拖拽/点击上传选区 */
 .dropzone {
   border: 2px dashed #bbb;
   background: #fafafa;
@@ -198,7 +199,38 @@ button.win11-btn.primary:hover { background: #005a1a; }
   border-radius: 8px;
   color: #555;
   font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.dropzone:hover {
+  border-color: var(--win-blue);
+  background: #f0f7ff;
+}
+
+/* 进度条样式设计 */
+.progress-container {
+  margin-bottom: 15px;
+}
+.progress-item {
+  background: #f3f3f3;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  border: 1px solid #e0e0e0;
+}
+.progress-bar {
+  background: #e0e0e0;
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  background: var(--win-blue);
+  width: 0%;
+  height: 100%;
+  transition: width 0.1s linear;
 }
 
 .section-box {
@@ -222,7 +254,9 @@ button.win11-btn.primary:hover { background: #005a1a; }
   border-radius: 8px; padding: 15px; text-align: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 200px;
 }
-.qr-card img { width: 160px; height: 160px; margin-top: 10px; }
+.local-qr-zone {
+  display: flex; justify-content: center; margin-top: 10px;
+}
 .qr-card p { font-size: 12px; margin: 5px 0; word-break: break-all; text-align: left; color:#444;}
 
 .preview-pane {
@@ -261,7 +295,7 @@ button.win11-btn.primary:hover { background: #005a1a; }
 .context-menu-item:hover { background: rgba(0, 0, 0, 0.05); }
 .context-menu-separator { height: 1px; background: #e5e5e5; margin: 4px 6px; }
 
-/* 全局弱提示通知 */
+/* 全局提示通知 */
 .toast-notice {
   position: fixed;
   bottom: 20px;
@@ -297,8 +331,8 @@ button.win11-btn.primary:hover { background: #005a1a; }
   </div>
 
   <div class="main" id="mainRightArea">
-    <div class="toolbar">
-      <div class="action-group">
+    <div class="toolbar" id="topToolbar">
+      <div class="action-group" id="toolbarActionGroup">
         <button class="win11-btn primary" onclick="fileInput.click()">➕ 上传新文件</button>
         <button class="win11-btn" onclick="openCreateFolderDialog()">📁 新建文件夹</button>
         <button class="win11-btn" onclick="deleteSelected()" style="color: #d13438;">❌ 批量删除</button>
@@ -306,12 +340,11 @@ button.win11-btn.primary:hover { background: #005a1a; }
         <button class="win11-btn" onclick="toggleSelectAll()">☑️ 全选/反选</button>
       </div>
       <div style="font-size: 12px; color: #888;" id="selected-count">已选中 0 个项目</div>
-      <input type="file" id="fileInput" multiple class="hidden" />
     </div>
+    
+    <input type="file" id="fileInput" multiple class="hidden" />
 
-    <div class="address-bar" id="address-path"></div>
-
-    <div id="uploadProgress" style="padding: 0 15px;"></div>
+    <div class="address-bar" id="address-path" style="visibility: hidden;"></div>
 
     <div class="content">
       <div id="qrPage">
@@ -328,7 +361,9 @@ button.win11-btn.primary:hover { background: #005a1a; }
 
         <div class="section-box">
           <h3 style="margin-top:0;">🚀 快捷拖放文件转码区</h3>
-          <div id="qrDropzone" class="dropzone">将文件拖放到这里，上传并生成二维码</div>
+          <div id="qrDropzone" class="dropzone" onclick="fileInput.click()">将文件拖放到这里，或者【点击此处】上传并生成二维码</div>
+          
+          <div id="qrUploadProgress" class="progress-container"></div>
           
           <h4>📋 本轮上传生成卡片流</h4>
           <div id="multiQRBox" class="qr-container"></div>
@@ -336,8 +371,11 @@ button.win11-btn.primary:hover { background: #005a1a; }
       </div>
 
       <div id="filePage" class="hidden">
-        <div id="dropzone" class="dropzone">拖拽文件到此处快速补充到当前文件夹</div>
-        <div id="fileGrid" class="file-grid"></div>
+        <div id="dropzone" class="dropzone" onclick="fileInput.click()">拖拽文件到此处，或者【点击此处】快速补充到当前文件夹</div>
+        
+        <div id="fileUploadProgress" class="progress-container"></div>
+
+        <div id="fileGrid" class="file-grid" ondblclick="handleGridDblClick(event)"></div>
 
         <div class="preview-pane">
           <strong style="font-size: 13px; display: block; margin-bottom: 8px;">🔍 属性与即时预览面板</strong>
@@ -358,10 +396,9 @@ const API = "https://qrapi.mutucun.com";
 let qrMode = "single";
 let files = [];
 let selected = new Set();
-let currentRightClickedItem = null; // 暂存右键选中的整个对象
-
-// ⭐ 核心目录变量："" 代表根目录，"photos/" 代表进入了 photos 文件夹
+let currentRightClickedItem = null; 
 let currentPrefix = ""; 
+let activePage = "qr"; 
 
 const $ = (id) => document.getElementById(id);
 
@@ -370,6 +407,14 @@ function showToast(msg) {
   t.innerText = msg;
   t.style.opacity = 1;
   setTimeout(() => t.style.opacity = 0, 2000);
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 function getFileIcon(item) {
@@ -384,12 +429,10 @@ function getFileIcon(item) {
   return '📄';
 }
 
-/* ⭐ 动态渲染 Win11 面包屑路径 */
 function renderAddressBar() {
   const bar = $("address-path");
   bar.innerHTML = "";
 
-  // 固定的“此电脑”根起点
   const rootCrumb = document.createElement("span");
   rootCrumb.className = "address-crumb";
   rootCrumb.innerText = "🖥️ 此电脑";
@@ -411,7 +454,6 @@ function renderAddressBar() {
       crumb.className = "address-crumb";
       crumb.innerText = part;
       
-      // 闭包绑定点击回到对应上级目录
       const targetPath = accumulatedPath;
       crumb.onclick = () => { currentPrefix = targetPath; refreshFiles(); };
       bar.appendChild(crumb);
@@ -419,19 +461,37 @@ function renderAddressBar() {
   }
 }
 
+function handleGridDblClick(e) {
+  if (e.target === $("fileGrid") && currentPrefix !== "") {
+    const parts = currentPrefix.split("/").filter(Boolean);
+    parts.pop(); 
+    currentPrefix = parts.length > 0 ? parts.join("/") + "/" : "";
+    selected.clear();
+    refreshFiles();
+  }
+}
+
+// ✨ 修复优化：在二维码视图下，将大工具栏（Toolbar）彻底彻底设为不占空间的隐藏状态
 function switchPage(page) {
+  activePage = page;
   if(page === 'qr') {
     $("qrPage").classList.remove("hidden");
     $("filePage").classList.add("hidden");
     $("menu-qr").classList.add("active");
     $("menu-files").classList.remove("active");
     $("address-path").style.visibility = "hidden";
+    
+    // 隐藏大工具栏，消除多余物理高度占位，内容自然置顶
+    $("topToolbar").classList.add("hidden");
   } else {
     $("qrPage").classList.add("hidden");
     $("filePage").classList.remove("hidden");
     $("menu-qr").classList.remove("active");
     $("menu-files").classList.add("active");
     $("address-path").style.visibility = "visible";
+    
+    // 资源管理器恢复显示大工具栏
+    $("topToolbar").classList.remove("hidden");
     refreshFiles();
   }
 }
@@ -450,7 +510,6 @@ function toggleMode() {
   $("modeBtn").innerText = "⚖️ 模式：" + (qrMode === "single" ? "单二维码" : "集合二维码");
 }
 
-/* ================= 资源管理器核心网格渲染 ================= */
 function renderGrid() {
   const grid = $("fileGrid");
   grid.innerHTML = "";
@@ -472,7 +531,6 @@ function renderGrid() {
       <div class="file-card-name" title="${f.name}">${f.name}</div>
     `;
 
-    // 左键单击选中逻辑
     card.onclick = (e) => {
       e.stopPropagation();
       if (selected.has(f.key)) { selected.delete(f.key); card.classList.remove("selected"); } 
@@ -480,11 +538,10 @@ function renderGrid() {
       updateSelectionUI();
     };
 
-    // ⭐ 左键双击感知：如果是文件夹就穿梭进入，文件就新窗打开直链
     card.ondblclick = (e) => { 
       e.stopPropagation(); 
       if (f.type === "folder") {
-        currentPrefix = f.key; // f.key 已经是带 / 结尾的完整前缀了
+        currentPrefix = f.key; 
         selected.clear();
         refreshFiles();
       } else {
@@ -513,7 +570,6 @@ function toggleSelectAll() {
   renderGrid();
 }
 
-/* ================= ⭐ 右键菜单智能感知适配 ================= */
 const menu = $("winContextMenu");
 
 $("mainRightArea").addEventListener("contextmenu", function(e) {
@@ -523,7 +579,6 @@ $("mainRightArea").addEventListener("contextmenu", function(e) {
   const cardEl = e.target.closest(".file-card");
   
   if (cardEl) {
-    // 找到对应的数据项
     const cards = Array.from(document.querySelectorAll('.file-card'));
     const index = cards.indexOf(cardEl);
     const f = files[index];
@@ -536,24 +591,21 @@ $("mainRightArea").addEventListener("contextmenu", function(e) {
     }
 
     if (f.type === "folder") {
-      // 文件夹特定的右键菜单
       menu.innerHTML = `
-        <div class="context-menu-item" onclick="currentPrefix='${f.key}'; refreshFiles();">🚪 双击进入文件夹</div>
+        <div class="context-menu-item" onclick="currentPrefix='${f.key}'; refreshFiles();">🚪 进入文件夹</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 删除文件夹</div>
+        <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 深度连带删除目录</div>
       `;
     } else {
-      // 文件特定的右键菜单
       menu.innerHTML = `
         <div class="context-menu-item" onclick="contextCopyLink('${f.url}')">🔗 复制文件直链</div>
         <div class="context-menu-item" onclick="contextShowQR('${f.url}')">📱 显示此文件二维码</div>
-        <div class="context-menu-item" onclick="previewFile('${f.url}')">🔬 即时加载预览</div>
+        <div class="context-menu-item" onclick="previewFile('${f.url}', ${f.size})">🔬 即时加载预览</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" style="color:#d13438;" onclick="contextDeleteOne()">❌ 永久删除项目</div>
       `;
     }
   } else {
-    // 空白处右键菜单
     currentRightClickedItem = null;
     menu.innerHTML = `
       <div class="context-menu-item" onclick="fileInput.click()">➕ 上传文件到此目录</div>
@@ -585,7 +637,10 @@ function contextShowQR(url) {
 
 async function contextDeleteOne() {
   if (!currentRightClickedItem) return;
-  if (!confirm(`确定要在 R2 中永久抹除 [${currentRightClickedItem.name}] 吗？`)) return;
+  const isFolder = currentRightClickedItem.type === "folder";
+  const tip = isFolder ? `⚠️ 警告：确定删除文件夹 [${currentRightClickedItem.name}] 吗？\n这将连带清空并物理删除该文件夹下的所有子文件！` : `确定要在 R2 中永久抹除 [${currentRightClickedItem.name}] 吗？`;
+  
+  if (!confirm(tip)) return;
   
   await fetch(`${API}/delete`, {
     method: "POST",
@@ -597,12 +652,9 @@ async function contextDeleteOne() {
   showToast("🗑️ 项目已移除");
 }
 
-/* ⭐ 新增原子功能：创建虚拟文件夹 */
 async function openCreateFolderDialog() {
   const name = prompt("请输入新建文件夹的名称:");
   if (!name || !name.trim()) return;
-  
-  // 按照规范拼接：当前目录前缀 + 新文件夹名 + /
   const folderPath = currentPrefix + name.trim() + "/";
 
   const res = await fetch(`${API}/create-folder`, {
@@ -619,58 +671,78 @@ async function openCreateFolderDialog() {
   }
 }
 
-/* ================= 异步上传管理逻辑（感知当前目录） ================= */
 async function upload(list) {
   if (list.length === 0) return;
-  $("uploadProgress").innerHTML = "";
+  
+  const targetProgressContainer = (activePage === "qr") ? $("qrUploadProgress") : $("fileUploadProgress");
+  targetProgressContainer.innerHTML = "";
 
   for (const file of list) {
     const item = document.createElement("div");
     item.className = "progress-item";
     item.innerHTML = `
-      <div style="font-size:12px;">正在同步到当前目录: ${file.name}</div>
+      <div style="font-size:12px; display:flex; justify-content:space-between;">
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">${file.name}</span>
+        <span class="percent-txt">0%</span>
+      </div>
       <div class="progress-bar"><div class="progress-bar-inner"></div></div>
     `;
     const bar = item.querySelector(".progress-bar-inner");
-    $("uploadProgress").appendChild(item);
+    const percentTxt = item.querySelector(".percent-txt");
+    targetProgressContainer.appendChild(item);
+
+    const dotIndex = file.name.lastIndexOf('.');
+    const nameWithoutExt = dotIndex !== -1 ? file.name.slice(0, dotIndex) : file.name;
+    const ext = dotIndex !== -1 ? file.name.slice(dotIndex) : '';
+    const timestamp = Date.now().toString().slice(-4); 
+    const safeName = `${nameWithoutExt}_${timestamp}${ext}`;
 
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${API}/upload`);
       xhr.upload.onprogress = e => {
-        if (e.lengthComputable) bar.style.width = (e.loaded / e.total) * 100 + "%";
+        if (e.lengthComputable) {
+          const percentage = Math.floor((e.loaded / e.total) * 100);
+          bar.style.width = percentage + "%";
+          percentTxt.innerText = percentage + "%";
+        }
       };
 
       xhr.onload = () => {
         try {
           const res = JSON.parse(xhr.responseText);
           bar.style.width = "100%";
+          percentTxt.innerText = "已完成";
           const absoluteUrl = `${API}/file/${encodeURIComponent(res.key)}`;
 
           const card = document.createElement("div");
           card.className = "qr-card";
+          const randomId = "local-qr-" + Math.random().toString(36).substring(2, 7);
           card.innerHTML = `
-            <p style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</p>
+            <p style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${safeName}</p>
             <p><a href="${absoluteUrl}" target="_blank">获取文件源链接</a></p>
-            <img src="${res.qr}">
+            <div class="local-qr-zone" id="${randomId}"></div>
           `;
           $("multiQRBox").appendChild(card);
+          
+          new QRCode(document.getElementById(randomId), { text: absoluteUrl, width: 160, height: 160 });
           resolve(res);
         } catch { reject(); }
       };
       xhr.onerror = reject;
       
       const fd = new FormData();
-      fd.append("file", file);
-      // ⭐ 核心注入：告诉后端当前在哪个虚拟文件夹下，后端据此拼接 Key 路径
-      fd.append("prefix", currentPrefix); 
+      const activePrefix = (activePage === "qr") ? "" : currentPrefix;
+      fd.append("file", file, safeName); 
+      fd.append("prefix", activePrefix); 
       xhr.send(fd);
     }).catch(() => {});
   }
-  refreshFiles();
+  
+  setTimeout(() => { targetProgressContainer.innerHTML = ""; }, 1500);
+  if (activePage === "files") refreshFiles();
 }
 
-/* ⭐ 获取文件列表升级：附带当前的目录前缀参数 */
 function refreshFiles() {
   fetch(`${API}/files?prefix=${encodeURIComponent(currentPrefix)}`)
     .then(r => r.json())
@@ -678,32 +750,33 @@ function refreshFiles() {
     .catch(() => console.error("无法拉取 R2 存储流"));
 }
 
-function previewFile(url) {
+function previewFile(url, size) {
   const box = $("previewBox");
+  const sizeString = size ? `<br>📂 <b>文件大小</b>: ${formatBytes(size)}` : "";
   box.innerHTML = "正在建立流管道，加载预览...";
 
   fetch(url)
     .then(r => r.blob())
     .then(blob => {
       if (blob.type.startsWith("image/")) {
-        box.innerHTML = `<img src="${URL.createObjectURL(blob)}" style="max-width: 240px; border-radius:4px; max-height: 200px;">`;
+        box.innerHTML = `<img src="${URL.createObjectURL(blob)}" style="max-width: 240px; border-radius:4px; max-height: 200px;">${sizeString}`;
       } else if (blob.type.startsWith("text/")) {
         const reader = new FileReader();
         reader.onload = () => {
-          box.innerHTML = `<pre style="background:#eee; padding:8px; border-radius:4px; max-height:150px; overflow:auto; font-size:11px;">${reader.result.slice(0, 1000)}</pre>`;
+          box.innerHTML = `<pre style="background:#eee; padding:8px; border-radius:4px; max-height:150px; overflow:auto; font-size:11px;">${reader.result.slice(0, 1000)}</pre>${sizeString}`;
         };
         reader.readAsText(blob);
       } else {
-        box.innerHTML = `⚠️ 该格式不支持内嵌预览。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击在此打开原文件</a>`;
+        box.innerHTML = `⚠️ 该格式不支持内嵌预览。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击打开原文件</a>${sizeString}`;
       }
     }).catch(() => {
-      box.innerHTML = `预览受限。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击直接去新标签页打开</a>`;
+      box.innerHTML = `预览受限。<br/><a href="${url}" target="_blank" style="color:var(--win-blue);">点击去新标签页打开</a>${sizeString}`;
     });
 }
 
 async function deleteSelected() {
-  if (selected.size === 0) { alert("请先在网格中单击选中项目！"); return; }
-  if (!confirm(`确定在 R2 中删除选中的 ${selected.size} 个项目吗？`)) return;
+  if (selected.size === 0) { alert("请先在网格中单选或框选项目！"); return; }
+  if (!confirm(`确定在 R2 中删除选中的 ${selected.size} 个项目吗？（如果是文件夹，其下级子项目也将同步连带清空）`)) return;
 
   await fetch(`${API}/delete`, {
     method: "POST",
@@ -712,23 +785,31 @@ async function deleteSelected() {
   });
   selected.clear();
   refreshFiles();
-  showToast("🗑 `批量项目已成功清理` ");
+  showToast("🗑️ 批量项目及目录已物理清理完成");
 }
 
 function bindDrag(id) {
   const el = $(id);
   if (!el) return;
-  el.ondragover = e => { e.preventDefault(); el.style.borderColor = "var(--win-blue)"; el.style.background = "#f0f7ff"; };
-  el.ondragleave = () => { el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; };
-  el.ondrop = e => { e.preventDefault(); el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; upload(e.dataTransfer.files); };
+  el.ondragover = e => { e.preventDefault(); e.stopPropagation(); el.style.borderColor = "var(--win-blue)"; el.style.background = "#f0f7ff"; };
+  el.ondragleave = (e) => { e.preventDefault(); e.stopPropagation(); el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; };
+  el.ondrop = e => { e.preventDefault(); e.stopPropagation(); el.style.borderColor = "#bbb"; el.style.background = "#fafafa"; upload(e.dataTransfer.files); };
 }
 bindDrag("dropzone");
 bindDrag("qrDropzone");
 
+// 确保容器外的点击穿透到隐藏 input
+$("qrDropzone").addEventListener("click", (e) => {
+  if(e.target === $("qrDropzone")) $("fileInput").click();
+});
+$("dropzone").addEventListener("click", (e) => {
+  if(e.target === $("dropzone")) $("fileInput").click();
+});
+
 $("fileInput").onchange = e => upload(e.target.files);
 
-// 初始化首屏
-renderAddressBar();
+// 初始化加载二维码页面
+switchPage('qr');
 </script>
 
 </body>
